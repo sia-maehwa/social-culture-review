@@ -12,6 +12,7 @@
     var color = /^#[0-9a-f]{6}$/i.test(options.color || '') ? options.color : DEFAULT_COLOR;
     var activeStroke = null;
     var activePointerId = null;
+    var activeInputStream = null;
     var redoStack = [];
     var ratio = 1;
     var logicalWidth = 0;
@@ -195,6 +196,7 @@
       if (!isInsideRoot(event.target) || isControlTarget(event.target)) return;
 
       activePointerId = event.pointerId;
+      activeInputStream = null;
       activeStroke = {
         t: mode === 'eraser' ? 'e' : 'p',
         c: color,
@@ -210,11 +212,23 @@
     }
     function onPointerMove(event) {
       if (!activeStroke || event.pointerId !== activePointerId) return;
+      /* 한 획에서는 rawupdate / pointermove 중 먼저 활성화된 입력 스트림 하나만 사용합니다.
+         두 스트림의 coalesced 좌표가 겹쳐 과거 좌표로 되돌아가는 현상을 막습니다. */
+      if (!activeInputStream) activeInputStream = 'move';
+      if (activeInputStream !== 'move') return;
+      appendSamples(event);
+    }
+    function onPointerRawUpdate(event) {
+      if (!activeStroke || event.pointerId !== activePointerId) return;
+      if (!activeInputStream) activeInputStream = 'raw';
+      if (activeInputStream !== 'raw') return;
       appendSamples(event);
     }
     function onMouseMoveFallback(event) {
       if (!activeStroke) return;
       if (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents) return;
+      if (!activeInputStream) activeInputStream = 'mouse';
+      if (activeInputStream !== 'mouse') return;
       appendSamples(event);
     }
     function finish(event) {
@@ -223,6 +237,7 @@
       var completed = activeStroke;
       activeStroke = null;
       activePointerId = null;
+      activeInputStream = null;
       root.classList.remove('pen-input-active');
       getStrokes().push(completed);
       redoStack = [];
@@ -235,6 +250,7 @@
       var interrupted = activeStroke;
       activeStroke = null;
       activePointerId = null;
+      activeInputStream = null;
       root.classList.remove('pen-input-active');
       if (interrupted.p.length) {
         getStrokes().push(interrupted);
@@ -247,8 +263,8 @@
     var capture = { capture: true, passive: false };
     document.addEventListener('pointerdown', onPointerDown, capture);
     document.addEventListener('pointermove', onPointerMove, capture);
-    /* 고주사율 펜의 프레임 사이 이동도 가능한 브라우저에서는 별도로 수집합니다. */
-    document.addEventListener('pointerrawupdate', onPointerMove, capture);
+    /* rawupdate를 지원하는 브라우저에서는 이 스트림을, 아니면 pointermove를 한 획 동안 사용합니다. */
+    document.addEventListener('pointerrawupdate', onPointerRawUpdate, capture);
     document.addEventListener('mousemove', onMouseMoveFallback, true);
     document.addEventListener('pointerup', finish, true);
     document.addEventListener('pointercancel', cancel, true);
@@ -300,7 +316,7 @@
       if (resizeObserver) resizeObserver.disconnect();
       document.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('pointermove', onPointerMove, true);
-      document.removeEventListener('pointerrawupdate', onPointerMove, true);
+      document.removeEventListener('pointerrawupdate', onPointerRawUpdate, true);
       document.removeEventListener('mousemove', onMouseMoveFallback, true);
       document.removeEventListener('pointerup', finish, true);
       document.removeEventListener('pointercancel', cancel, true);
