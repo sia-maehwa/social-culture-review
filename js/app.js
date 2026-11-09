@@ -81,16 +81,11 @@
 
   var CHOICE_LABELS = ['①', '②', '③', '④', '⑤'];
 
-  /* 스타일러스 hover와 펜 입력 시 브라우저 패닝 억제를 함께 처리합니다. */
-  (function bindStylusHover() {
-    var activeTarget = null;
+  /* 펜이 화면 위에 있을 때 필기 면의 브라우저 패닝만 제한합니다.
+     시각적 호버 효과는 요소별 CSS :hover가 담당하며 JS 대상 선택자에 의존하지 않습니다. */
+  (function bindStylusSurfaceLock() {
     var lockedRoot = null;
-    var selector = 'button:not(:disabled), a[href], [role="button"], .unit-card, .exam-card, .choice, .pq-choice, .omr-cell, .ctab, .cmd-btn, .grow-btn';
 
-    function clearHover() {
-      if (activeTarget) activeTarget.classList.remove('pen-hover');
-      activeTarget = null;
-    }
     function lockPenRoot(target) {
       var nextRoot = target && target.closest ? target.closest('.pen-surface-root') : null;
       if (nextRoot === lockedRoot) return;
@@ -98,78 +93,38 @@
       lockedRoot = nextRoot;
       if (lockedRoot) lockedRoot.classList.add('pen-hover-input');
     }
-    function updateHover(target, pointerType) {
-      var next = target && target.closest ? target.closest(selector) : null;
-      if (next !== activeTarget) {
-        clearHover();
-        activeTarget = next;
-        if (activeTarget) activeTarget.classList.add('pen-hover-target', 'pen-hover');
-      }
-      /* 일부 Android 펜 드라이버는 hover를 mouse 계열로 보고합니다.
-         실제 touch에서 생성된 mouse 이벤트는 위에서 제외했으므로 이 경로도 펜 입력 면을 잠급니다. */
-      if (pointerType === 'pen' || pointerType === 'mouse') lockPenRoot(target);
-    }
     function hitTest(event) {
       if (typeof document.elementFromPoint === 'function') {
         return document.elementFromPoint(event.clientX, event.clientY) || event.target;
       }
       return event.target;
     }
-    function handleMove(event, pointerType) {
+    function isHoverPointer(event) {
+      return event.pointerType === 'pen' || event.pointerType === 'mouse';
+    }
+    function updateSurface(event) {
       if (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents) return;
-      var type = pointerType || event.pointerType;
-      if (type === 'pen' && event.buttons === 0) {
-        updateHover(hitTest(event), 'pen');
-      } else if (type === 'mouse' && event.buttons === 0) {
-        updateHover(hitTest(event), 'mouse');
-      } else if (type === 'pen') {
-        clearHover();
-        lockPenRoot(hitTest(event));
-      } else {
-        clearHover();
-      }
+      if (isHoverPointer(event)) lockPenRoot(hitTest(event));
     }
 
     document.addEventListener('pointerover', function (event) {
-      /* 버튼을 누르기 전 대상에 진입하는 순간부터 pen/mouse hover를 적용합니다. */
-      if ((event.pointerType === 'pen' || event.pointerType === 'mouse') && event.buttons === 0) {
-        updateHover(hitTest(event), event.pointerType);
-      }
+      if (isHoverPointer(event) && event.buttons === 0) updateSurface(event);
     }, true);
-    document.addEventListener('pointermove', function (event) { handleMove(event); }, true);
+    document.addEventListener('pointermove', updateSurface, true);
 
-    /* 구형/제조사 Android 입력 스택에서 hover를 mousemove로만 노출하는 경우의 보조 경로 */
+    /* 포인터 이벤트를 제공하지 않는 구형 Android 입력 스택에 대한 보조 경로 */
     document.addEventListener('mousemove', function (event) {
       if (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents) return;
-      handleMove(event, 'mouse');
+      lockPenRoot(hitTest(event));
     }, true);
 
     document.addEventListener('pointerdown', function (event) {
-      clearHover();
       if (event.pointerType === 'pen') lockPenRoot(event.target);
     }, true);
-    document.addEventListener('pointerup', function (event) {
-      if (event.pointerType === 'pen') {
-        var current = hitTest(event);
-        if (current && current.closest && current.closest('.pen-surface-root')) lockPenRoot(current);
-      }
-    }, true);
-    document.addEventListener('pointercancel', function (event) {
-      if (event.pointerType === 'pen') {
-        var current = hitTest(event);
-        if (current && current.closest && current.closest('.pen-surface-root')) lockPenRoot(current);
-      }
-    }, true);
     document.addEventListener('pointerout', function (event) {
-      if (event.pointerType === 'pen' && !event.relatedTarget) {
-        clearHover();
-        lockPenRoot(null);
-      }
+      if (isHoverPointer(event) && !event.relatedTarget) lockPenRoot(null);
     }, true);
-    window.addEventListener('blur', function () {
-      clearHover();
-      lockPenRoot(null);
-    });
+    window.addEventListener('blur', function () { lockPenRoot(null); });
   })();
 
   function getSelectedSubject() {
