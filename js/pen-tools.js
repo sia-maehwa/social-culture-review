@@ -12,7 +12,6 @@
     var color = /^#[0-9a-f]{6}$/i.test(options.color || '') ? options.color : DEFAULT_COLOR;
     var activeStroke = null;
     var activePointerId = null;
-    var activeInputStream = null;
     var redoStack = [];
     var ratio = 1;
     var logicalWidth = 0;
@@ -181,7 +180,7 @@
       for (var i = 0; i < samples.length; i++) {
         if (appendPoint(samples[i])) added.push(lastPoint());
       }
-      /* 마지막 좌표도 포함합니다. pointerrawupdate/pointermove 중복은 좌표 비교로 걸러집니다. */
+      /* 마지막 좌표도 포함합니다. */
       if (appendPoint(event)) added.push(lastPoint());
       if (!added.length) return;
       if (previous) drawSegments(activeStroke, previous, added);
@@ -196,7 +195,6 @@
       if (!isInsideRoot(event.target) || isControlTarget(event.target)) return;
 
       activePointerId = event.pointerId;
-      activeInputStream = null;
       activeStroke = {
         t: mode === 'eraser' ? 'e' : 'p',
         c: color,
@@ -207,28 +205,12 @@
       root.classList.add('pen-input-active');
       try { root.setPointerCapture(event.pointerId); } catch (ignore) {}
       drawDot(activeStroke, activeStroke.p[0]);
-      /* pointerdown은 취소하지 않습니다. 일부 Android Chrome이 생성하는 보조 mousemove
-         이벤트도 아래 fallback 입력 경로에서 사용할 수 있게 둡니다. */
+      /* 펜 입력은 pointermove/getCoalescedEvents 단일 경로로 수집합니다. */
     }
     function onPointerMove(event) {
       if (!activeStroke || event.pointerId !== activePointerId) return;
-      /* 한 획에서는 rawupdate / pointermove 중 먼저 활성화된 입력 스트림 하나만 사용합니다.
-         두 스트림의 coalesced 좌표가 겹쳐 과거 좌표로 되돌아가는 현상을 막습니다. */
-      if (!activeInputStream) activeInputStream = 'move';
-      if (activeInputStream !== 'move') return;
-      appendSamples(event);
-    }
-    function onPointerRawUpdate(event) {
-      if (!activeStroke || event.pointerId !== activePointerId) return;
-      if (!activeInputStream) activeInputStream = 'raw';
-      if (activeInputStream !== 'raw') return;
-      appendSamples(event);
-    }
-    function onMouseMoveFallback(event) {
-      if (!activeStroke) return;
-      if (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents) return;
-      if (!activeInputStream) activeInputStream = 'mouse';
-      if (activeInputStream !== 'mouse') return;
+      /* 한 가지 표준 스트림만 사용합니다. getCoalescedEvents()가 프레임 사이의
+         실제 펜 좌표를 묶어서 제공하므로 별도 이동 이벤트와 섞지 않습니다. */
       appendSamples(event);
     }
     function finish(event) {
@@ -237,7 +219,7 @@
       var completed = activeStroke;
       activeStroke = null;
       activePointerId = null;
-      activeInputStream = null;
+
       root.classList.remove('pen-input-active');
       getStrokes().push(completed);
       redoStack = [];
@@ -246,11 +228,11 @@
     }
     function cancel(event) {
       if (!activeStroke || (event && event.pointerId !== activePointerId)) return;
-      /* 브라우저의 pointercancel/pointer capture 해제도 마지막으로 수신한 부분 획은 저장합니다. */
+      /* 브라우저가 실제 pointercancel을 보냈을 때 수신한 부분 획을 보존합니다. */
       var interrupted = activeStroke;
       activeStroke = null;
       activePointerId = null;
-      activeInputStream = null;
+
       root.classList.remove('pen-input-active');
       if (interrupted.p.length) {
         getStrokes().push(interrupted);
@@ -263,12 +245,9 @@
     var capture = { capture: true, passive: false };
     document.addEventListener('pointerdown', onPointerDown, capture);
     document.addEventListener('pointermove', onPointerMove, capture);
-    /* rawupdate를 지원하는 브라우저에서는 이 스트림을, 아니면 pointermove를 한 획 동안 사용합니다. */
-    document.addEventListener('pointerrawupdate', onPointerRawUpdate, capture);
-    document.addEventListener('mousemove', onMouseMoveFallback, true);
     document.addEventListener('pointerup', finish, true);
     document.addEventListener('pointercancel', cancel, true);
-    document.addEventListener('lostpointercapture', cancel, true);
+    /* 포인터 캡처가 해제되어도 실제 pointerup 또는 pointercancel 전까지 추적을 유지합니다. */
 
     root.querySelectorAll('[data-penmode]').forEach(function (button) {
       button.addEventListener('click', function () { setMode(button.dataset.penmode); });
@@ -316,11 +295,8 @@
       if (resizeObserver) resizeObserver.disconnect();
       document.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('pointermove', onPointerMove, true);
-      document.removeEventListener('pointerrawupdate', onPointerRawUpdate, true);
-      document.removeEventListener('mousemove', onMouseMoveFallback, true);
       document.removeEventListener('pointerup', finish, true);
       document.removeEventListener('pointercancel', cancel, true);
-      document.removeEventListener('lostpointercapture', cancel, true);
       try { if (activePointerId !== null) root.releasePointerCapture(activePointerId); } catch (ignore) {}
       if (canvas.parentNode === root) root.removeChild(canvas);
       root.classList.remove('pen-surface-root', 'pen-input-active');
