@@ -13,7 +13,7 @@ GitHub Settings → Rules → Rulesets에서 main 브랜치에 적용되는 활�
 - Require a pull request before merging
 - Required approvals: 1
 - Require review from Code Owners
-- Required status check: JavaScript syntax / validate
+- Required status check: quality-check / validate
 - Block force pushes
 - Restrict deletions
 
