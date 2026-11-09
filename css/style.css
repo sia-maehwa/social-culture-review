@@ -921,4 +921,3 @@ p, li, figcaption { text-wrap: pretty; }
   .subject-pick-mark { flex-basis: 44px; width: 44px; height: 44px; border-radius: 13px; }
   .subject-pick-action { font-size: var(--text-xs); }
 }
-@media (prefers-reduced-motion: reduce) { .pen-hover-target { transition: none; } }
