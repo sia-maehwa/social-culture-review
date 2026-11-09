@@ -141,8 +141,8 @@
       '</div>';
     if (subject.features && subject.features.exams) {
       html += '<a class="exam-banner" href="#" data-nav-exam>' +
-        '<span class="eb-badge">자체 제작 예상 모의고사</span>' +
-        '<span class="eb-title">자체 제작 모의고사로 실전 연습</span>' +
+        '<span class="eb-badge">평가원 기출 15회 · 예상 3회</span>' +
+        '<span class="eb-title">기출·예상 모의고사로 실전 연습</span>' +
         '<span class="eb-cta">응시하기 →</span></a>';
     }
 
