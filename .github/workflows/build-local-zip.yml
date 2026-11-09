@@ -1,4 +1,4 @@
-name: Build local ZIP entrypoint
+name: Build local app and deploy GitHub Pages
 
 on:
   push:
@@ -10,21 +10,36 @@ on:
       - 'assets/**'
       - 'tools/build-offline.js'
       - '.github/workflows/build-local-zip.yml'
+  workflow_dispatch:
+
 permissions:
   contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
 jobs:
   build:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - name: Check JavaScript syntax
         run: find js tools -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+
       - name: Build standalone local index.html
         run: node tools/build-offline.js
+
       - name: Commit updated local entrypoint
         run: |
           git config user.name "github-actions[bot]"
@@ -32,7 +47,23 @@ jobs:
           git add index.html
           if git diff --cached --quiet; then
             echo "Local entrypoint is already current."
-            exit 0
+          else
+            git commit -m "Build standalone local study app"
+            git push origin HEAD:main
           fi
-          git commit -m "Build standalone local study app"
-          git push origin HEAD:main
+
+      - name: Prepare GitHub Pages output
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp index.html _site/index.html
+          touch _site/.nojekyll
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
