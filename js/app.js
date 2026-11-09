@@ -2,13 +2,9 @@
 (function () {
   'use strict';
 
-  var ACTIVE_SUBJECT = window.SubjectRegistry ? window.SubjectRegistry.current() : { id: 'social-culture', storagePrefix: 'socmul', title: '사회·문화' };
-  var STORAGE_PREFIX = ACTIVE_SUBJECT.storagePrefix || ACTIVE_SUBJECT.id;
-  var WRONG_KEY = STORAGE_PREFIX + '_wrong_v1';
-  var STATS_KEY = STORAGE_PREFIX + '_stats_v1';
-  var QUIZ_PEN_KEY = STORAGE_PREFIX + '_quiz_pen_v1';
-  var PEN_COLOR_KEY = STORAGE_PREFIX + '_pen_color_v1';
-  var DEFAULT_PEN_COLOR = (window.Store && window.Store.get(PEN_COLOR_KEY)) || '#d6336c';
+  var WRONG_KEY = 'socmul_wrong_v1';
+  var STATS_KEY = 'socmul_stats_v1';
+  var QUIZ_PEN_KEY = 'socmul_quiz_pen_v1';
 
   var UNIT_COLORS = {
     1: '#2456e6',
@@ -74,7 +70,7 @@
   var CHOICE_LABELS = ['①', '②', '③', '④', '⑤'];
 
   /* ─── 앱 상태 ─── */
-  var state = { view: 'home', unit: 0, ids: [], idx: 0, answered: {}, results: [], mode: 'unit', penMode: 'pen', penColor: DEFAULT_PEN_COLOR };
+  var state = { view: 'home', unit: 0, ids: [], idx: 0, answered: {}, results: [], mode: 'unit', penMode: 'pen' };
 
   var el = {
     views: {
@@ -91,29 +87,7 @@
     wrongBadge: document.getElementById('wrongCountBadge'),
   };
 
-  function setupSubjectUI() {
-    var registry = window.SubjectRegistry, subject = registry ? registry.current() : null;
-    if (!subject) return;
-    var examNav = document.querySelector('[data-nav="exam"]');
-    var gameNav = document.querySelector('[data-nav="game"]');
-    if (examNav) examNav.hidden = !(subject.features && subject.features.exams);
-    if (gameNav) gameNav.hidden = !(subject.features && subject.features.game);
-    var wrap = document.getElementById('subjectSwitcherWrap');
-    var select = document.getElementById('subjectSwitcher');
-    var subjects = registry.list();
-    if (!wrap || !select || subjects.length < 2) return;
-    select.innerHTML = subjects.map(function (item) {
-      return '<option value="' + esc(item.id) + '">' + esc(item.title) + '</option>';
-    }).join('');
-    select.value = subject.id; wrap.hidden = false;
-    select.addEventListener('change', function () {
-      if (registry.activate(select.value)) window.location.reload();
-    });
-  }
-
   function show(view) {
-    if (view !== 'quiz' && el.views.quiz && el.views.quiz._penToolsCleanup) el.views.quiz._penToolsCleanup();
-    if (view !== 'examrun' && el.views.examrun && el.views.examrun._penToolsCleanup) el.views.examrun._penToolsCleanup();
     if (window.ExamUI) window.ExamUI.cleanup();
     if (window.GameUI) window.GameUI.cleanup();
     state.view = view;
@@ -133,18 +107,16 @@
     var wrong = getWrong();
     var wrongCount = Object.keys(wrong).length;
 
-    var subject = window.SubjectRegistry ? window.SubjectRegistry.current() : { title: '사회·문화', curriculumLabel: '2015 개정 교육과정', description: '' };
     var html = '<div class="hero">' +
-      '<span class="hero-kicker">' + esc(subject.curriculumLabel || '과목별 학습') + ' · ' + esc(subject.title) + '</span>' +
-      '<h1>' + esc(subject.title) + ' 단원별 문제로<br>학습 감각을 높이세요</h1>' +
-      '<p>' + esc(subject.description || '단원별 개념 문제와 해설을 학습하고 취약 영역을 확인하세요.') + ' 현재 등록된 문제 ' + QUESTIONS.length + '문항입니다. 틀린 문제는 오답 노트에 쌓이고, 단원별 정답률로 취약 단원을 확인할 수 있습니다.</p>' +
+      '<span class="hero-kicker">2015 개정 교육과정 · 사회·문화</span>' +
+      '<h1>단원을 골라 개념 문제로<br>수능 감각을 연습하세요</h1>' +
+      '<p>수능·평가원 기출 출제 경향을 반영해 제작한 개념 문제 ' + QUESTIONS.length + '문항. 틀린 문제는 자동으로 오답 노트에 쌓이고, 단원별 정답률로 취약 단원을 확인할 수 있습니다.</p>' +
       '</div>';
-    if (subject.features && subject.features.exams) {
-      html += '<a class="exam-banner" href="#" data-nav-exam>' +
-        '<span class="eb-badge">평가원 기출 15회 · 예상 3회</span>' +
-        '<span class="eb-title">기출·예상 모의고사로 실전 연습</span>' +
-        '<span class="eb-cta">응시하기 →</span></a>';
-    }
+
+    html += '<a class="exam-banner" href="#" data-nav-exam>' +
+      '<span class="eb-badge">실전 모의고사</span>' +
+      '<span class="eb-title">평가원 기출 5개년 · 15회분 (수능·6월·9월)</span>' +
+      '<span class="eb-cta">응시하기 →</span></a>';
 
     html += '<div class="stat-strip">' +
       statCard('누적 학습', stats.total + '<small style="font-size:.55em">문항</small>') +
@@ -152,16 +124,14 @@
       statCard('오답 노트', wrongCount + '<small style="font-size:.55em">문항</small>', true) +
       '</div>';
 
-    html += '<div class="section-head"><h2>단원 선택</h2><span>' + esc(subject.title) + '</span></div>';
+    html += '<div class="section-head"><h2>단원 선택</h2><span>2015 개정 교육과정 사회·문화</span></div>';
     html += '<div class="unit-grid">';
 
     UNITS.forEach(function (u) {
       var qs = unitQuestions(u.id);
       var st = stats.byUnit[u.id] || { total: 0, correct: 0 };
       var acc = st.total ? Math.round((st.correct / st.total) * 100) : null;
-      var palette = ['#2456e6', '#0d8f6e', '#e08a00', '#7a39bb', '#c2456b'];
-      var unitAccent = UNIT_COLORS[u.id] || palette[(u.id - 1) % palette.length];
-      html += '<div class="unit-card" style="--unit-accent:' + unitAccent + '">' +
+      html += '<div class="unit-card" style="--unit-accent:' + UNIT_COLORS[u.id] + '">' +
         '<div class="unit-top"><span class="unit-num">UNIT ' + u.id + '</span>' +
         '<span class="unit-qcount">' + qs.length + '문항</span></div>' +
         '<h3 class="unit-name">' + u.name + '</h3>' +
@@ -218,32 +188,34 @@
   }
 
   function quizPenBarHtml() {
-    var colors = [['#d6336c','빨강'],['#2563eb','파랑'],['#20252b','검정'],['#16a34a','초록'],['#9333ea','보라'],['#ea580c','주황']];
     return '<div class="pen-bar quiz-pen-bar" aria-label="문제 풀이 필기 도구">' +
       '<span class="pen-bar-label">풀이 필기</span>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'pen' ? ' active' : '') + '" data-penmode="pen" aria-pressed="' + (state.penMode === 'pen') + '">펜</button>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'eraser' ? ' active' : '') + '" data-penmode="eraser" aria-pressed="' + (state.penMode === 'eraser') + '">지우개</button>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'off' ? ' active' : '') + '" data-penmode="off" aria-pressed="' + (state.penMode === 'off') + '">필기 끄기</button>' +
-      '<span class="pen-palette" role="group" aria-label="펜 색상">' + colors.map(function (item) {
-        return '<button type="button" class="pen-color' + (state.penColor === item[0] ? ' active' : '') + '" data-pencolor="' + item[0] + '" aria-label="' + item[1] + '" title="' + item[1] + '" aria-pressed="' + (state.penColor === item[0]) + '"><i style="background:' + item[0] + '"></i></button>';
-      }).join('') + '</span>' +
       '<button type="button" class="pen-tool" data-penundo disabled>실행 취소</button>' +
       '<button type="button" class="pen-tool" data-penredo disabled>다시 실행</button>' +
       '<button type="button" class="pen-tool" data-penclear>전체 지우기</button>' +
-      '<button type="button" class="pen-tool" data-penexpand>공간 확대</button>' +
-      '<button type="button" class="pen-tool" data-penfullscreen>전체화면</button>' +
-      '<span class="pen-input-hint">펜 입력 중 화면 이동 잠금 · 스크롤하려면 필기를 끄세요.</span>' +
+      '<span class="pen-input-hint">스타일러스 전용 · 손가락은 스크롤</span>' +
       '</div>';
   }
 
   function bindQuizPen(view, question) {
     var canvas = view.querySelector('.quiz-pen-canvas');
     if (!canvas || !window.PenTools) return;
+
     var all = readJSON(QUIZ_PEN_KEY, {});
     var questionKey = String(question.id);
     var strokes = Array.isArray(all[questionKey]) ? all[questionKey] : [];
-    var tools = window.PenTools.bind({
-      root: view, canvas: canvas, mode: state.penMode, color: state.penColor,
+    var rect = canvas.getBoundingClientRect();
+    var ratio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    canvas.width = Math.max(900, Math.round(rect.width * ratio));
+    canvas.height = Math.max(260, Math.round(rect.height * ratio));
+
+    window.PenTools.bind({
+      root: view,
+      canvas: canvas,
+      mode: state.penMode,
       getStrokes: function () { return strokes; },
       save: function () {
         var latest = readJSON(QUIZ_PEN_KEY, {});
@@ -251,10 +223,8 @@
         writeJSON(QUIZ_PEN_KEY, latest);
       },
       onModeChange: function (mode) { state.penMode = mode; },
-      onColorChange: function (color) { state.penColor = color; try { storage.setItem(PEN_COLOR_KEY, color); } catch (ignore) {} },
       clearMessage: '이 문제의 필기를 모두 지울까요?'
     });
-    if (tools) view._penToolsCleanup = tools.destroy;
   }
 
   function renderQuiz() {
@@ -535,6 +505,5 @@
   window.AppUI = { show: show };
 
   /* ─── 시작 ─── */
-  setupSubjectUI();
   show('home');
 })();

@@ -1,16 +1,14 @@
-/* 사회문화 연습장 — 평가원 기출 15회 및 자체 제작 예상 모의고사 3회
+/* 사회문화 연습장 — 실전 모의고사 모드
+   기출 15회분 + 수능 예상 모의고사 3회분(자체 제작)
    점수 채점(배점 합산) · 등급컷 · 도표 문항 제외 · 펜 필기 지원 */
 (function () {
   'use strict';
 
   var EXAM_TIME = 30 * 60; /* 수능 사회탐구 30분 */
   var CHOICE_LABELS = ['①', '②', '③', '④', '⑤'];
-  var ACTIVE_SUBJECT = window.SubjectRegistry ? window.SubjectRegistry.current() : { id: 'social-culture', storagePrefix: 'socmul' };
-  var STORAGE_PREFIX = ACTIVE_SUBJECT.storagePrefix || ACTIVE_SUBJECT.id;
-  var HIST_KEY = STORAGE_PREFIX + '_exam_hist_v1';
-  var NODOYO_KEY = STORAGE_PREFIX + '_nodopyo_v1';
-  var PEN_KEY = STORAGE_PREFIX + '_pen_v1';
-  var PEN_COLOR_KEY = STORAGE_PREFIX + '_pen_color_v1';
+  var HIST_KEY = 'socmul_exam_hist_v1';
+  var NODOYO_KEY = 'socmul_nodopyo_v1';
+  var PEN_KEY = 'socmul_pen_v1';
 
   var state = {
     examId: null,
@@ -21,7 +19,6 @@
     submitted: false,
     history: [],      /* { id, score, max, correct, total, at } */
     penMode: 'pen',   /* pen | eraser | off */
-    penColor: (window.Store && window.Store.get(PEN_COLOR_KEY)) || '#d6336c',
     strokes: {},      /* { 문항인덱스: [stroke, ...] } */
   };
 
@@ -143,9 +140,9 @@
     var nodopyo = excludeDopyo();
 
     var html = '<div class="hero exam-hero">' +
-      '<span class="hero-kicker">평가원 기출 15회 · 자체 제작 예상 3회</span>' +
-      '<h1>기출·예상 모의고사로<br>실전 감각을 점검하세요</h1>' +
-      '<p>2022~2026학년도 사회·문화 6월·9월 모의평가와 수능 총 15회분, 자체 제작 예상 모의고사 3회분을 제공합니다. 각 시험은 20문항·50점이며 제한 시간은 30분입니다.</p>' +
+      '<span class="hero-kicker">기출 15회분 + 자체 제작 예상 모의고사 3회분</span>' +
+      '<h1>실전 모의고사로<br>실제 시험 감각을 익히세요</h1>' +
+      '<p>2022~2026학년도 수능·6월·9월 평가원 기출 15회분과, 기출 300문항 분석을 바탕으로 제작한 예상 모의고사 3회분. 제한 시간 30분, 점수 채점(배점 2·3점 합산) 후 예상 등급까지 확인합니다.</p>' +
       '</div>';
 
     /* 도표 제외 설정 */
@@ -184,8 +181,8 @@
       html += '</div></div></details>';
     }
 
-    /* 기출 자료 취급 안내 */
-    html += '<div class="exam-rights-notice"><b>개인 학습용 로컬 기출 자료</b><p>평가원 기출 이미지와 회차 데이터는 비공개 저장소에서 개인 학습용으로 사용합니다. 외부 공개·공유·재배포하지 마세요.</p></div>';
+    /* 기출 목록 */
+    html += '<div class="section-head" style="margin-top:var(--space-8)"><h2>평가원 기출 5개년</h2><span>총 15회 · 300문항</span></div>';
 
     var years = [];
     allExams().forEach(function (e) { if (e.year && years.indexOf(e.year) === -1) years.push(e.year); });
@@ -206,7 +203,7 @@
       html += '</div></div>';
     });
 
-    html += '<p class="exam-src-note">자체 제작 예상 모의고사는 학습용 참고 자료이며 실제 평가원 출제 문항이 아닙니다.</p>';
+    html += '<p class="exam-src-note">출제: 한국교육과정평가원 (공공저작물 제56조에 따라 출처를 표시하고 제공합니다)</p>';
     if (window.Store && !window.Store.persistent) {
       html += '<p class="exam-src-note">이 브라우저에서는 기록 저장이 제한되어 페이지를 닫으면 응시 기록이 사라질 수 있습니다.</p>';
     }
@@ -263,42 +260,34 @@
 
   /* ─── 펜 필기 ─── */
   function penBarHtml() {
-    var colors = [['#d6336c','빨강'],['#2563eb','파랑'],['#20252b','검정'],['#16a34a','초록'],['#9333ea','보라'],['#ea580c','주황']];
     return '<div class="pen-bar" aria-label="필기 도구">' +
       '<span class="pen-bar-label">필기 도구</span>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'pen' ? ' active' : '') + '" data-penmode="pen" aria-pressed="' + (state.penMode === 'pen') + '">펜</button>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'eraser' ? ' active' : '') + '" data-penmode="eraser" aria-pressed="' + (state.penMode === 'eraser') + '">지우개</button>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'off' ? ' active' : '') + '" data-penmode="off" aria-pressed="' + (state.penMode === 'off') + '">필기 끄기</button>' +
-      '<span class="pen-palette" role="group" aria-label="펜 색상">' + colors.map(function (item) {
-        return '<button type="button" class="pen-color' + (state.penColor === item[0] ? ' active' : '') + '" data-pencolor="' + item[0] + '" aria-label="' + item[1] + '" title="' + item[1] + '" aria-pressed="' + (state.penColor === item[0]) + '"><i style="background:' + item[0] + '"></i></button>';
-      }).join('') + '</span>' +
       '<button type="button" class="pen-tool" data-penundo disabled>실행 취소</button>' +
       '<button type="button" class="pen-tool" data-penredo disabled>다시 실행</button>' +
       '<button type="button" class="pen-tool" data-penclear>전체 지우기</button>' +
-      '<button type="button" class="pen-tool" data-penexpand>공간 확대</button>' +
-      '<button type="button" class="pen-tool" data-penfullscreen>전체화면</button>' +
-      '<span class="pen-input-hint">펜 입력 중 화면 이동 잠금 · 스크롤하려면 필기를 끄세요.</span>' +
+      '<span class="pen-input-hint">스타일러스 전용 · 손가락은 스크롤</span>' +
       '</div>';
   }
 
   function bindPen(view, canvas, qIdx) {
     if (!canvas) return;
     if (window.PenTools) {
-      var tools = window.PenTools.bind({
-        root: view, canvas: canvas, mode: state.penMode, color: state.penColor,
+      return window.PenTools.bind({
+        root: view,
+        canvas: canvas,
+        mode: state.penMode,
         getStrokes: function () { return state.strokes[qIdx] || (state.strokes[qIdx] = []); },
         save: savePen,
         onModeChange: function (mode) { state.penMode = mode; },
-        onColorChange: function (color) { state.penColor = color; if (window.Store) window.Store.set(PEN_COLOR_KEY, color); },
         clearMessage: '이 문항의 필기를 모두 지울까요?'
       });
-      if (tools) view._penToolsCleanup = tools.destroy;
-      return tools;
     }
   }
 
   function renderRun(view) {
-    if (view._penToolsCleanup) { view._penToolsCleanup(); view._penToolsCleanup = null; }
     var e = examById(state.examId);
     if (!e) { if (window.AppUI) window.AppUI.show('exam'); return; }
     var inc = includedIdx(e);
@@ -534,7 +523,7 @@
     html += '</div>';
 
     html += '<p class="exam-src-note" style="margin-top:var(--space-6)">' +
-      (isPredict(e) ? '예상 모의고사는 자체 제작 학습용 문항입니다.' : '평가원 기출 원본 이미지가 포함된 개인 학습용 자료입니다. ') +
+      (isPredict(e) ? '예상 모의고사는 기출 분석 기반 자체 제작 문항입니다.' : '출제: 한국교육과정평가원 · ') +
       '복습은 단원별 개념 정리와 오답 노트를 활용해 보세요.</p>';
 
     view.innerHTML = html;
