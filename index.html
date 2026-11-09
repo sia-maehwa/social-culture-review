@@ -121,19 +121,20 @@ p, li, figcaption { text-wrap: pretty; }
   border-bottom: 1px solid var(--color-divider);
 }
 .header-inner {
-  max-width: var(--content-default);
-  margin: 0 auto; padding: var(--space-3) var(--space-5);
+  width: 100%; max-width: 1440px;
+  margin: 0 auto; padding: var(--space-3) clamp(16px, 3vw, 40px);
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
 }
-.logo { display: flex; align-items: center; gap: var(--space-3); text-decoration: none; color: inherit; }
-.logo-text { font-size: var(--text-lg); font-weight: 800; letter-spacing: -0.01em; }
+.logo { display: flex; flex: 0 0 auto; align-items: center; gap: var(--space-3); white-space: nowrap; text-decoration: none; color: inherit; }
+.logo-text { white-space: nowrap; font-size: var(--text-lg); font-weight: 800; letter-spacing: -0.01em; }
 .logo-text em { font-style: normal; color: var(--color-primary); }
 
-.gnb { display: flex; gap: var(--space-1); }
+.gnb { display: flex; flex: 1 1 auto; min-width: 0; justify-content: flex-end; flex-wrap: nowrap; gap: 4px; }
 .gnb-btn {
-  padding: var(--space-2) var(--space-4);
+  flex: 0 0 auto; white-space: nowrap;
+  padding: var(--space-2) clamp(8px, 0.9vw, 14px);
   border-radius: var(--radius-full, 9999px);
-  font-size: var(--text-sm); font-weight: 600; color: var(--color-text-muted);
+  font-size: clamp(0.78rem, 0.9vw, 1rem); font-weight: 600; color: var(--color-text-muted);
   transition: all var(--transition-interactive);
 }
 .gnb-btn:hover { background: var(--color-primary-highlight); color: var(--color-primary); }
@@ -456,6 +457,15 @@ p, li, figcaption { text-wrap: pretty; }
 }
 .site-footer p { font-size: var(--text-xs); color: var(--color-text-faint); margin: 0 auto; max-width: 68ch; }
 
+/* 넓은 태블릿/좁은 데스크톱에서는 로고와 메뉴를 분리해 텍스트가 눌리지 않게 합니다. */
+@media (max-width: 980px) and (min-width: 641px) {
+  .header-inner { flex-direction: column; align-items: stretch; gap: var(--space-2); }
+  .logo { justify-content: center; }
+  .gnb { justify-content: flex-start; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; }
+  .gnb::-webkit-scrollbar { display: none; }
+  .gnb-btn { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+}
+
 /* ─── 반응형 ─── */
 @media (max-width: 640px) {
   .header-inner { flex-direction: column; align-items: stretch; gap: var(--space-2); }
@@ -629,6 +639,9 @@ p, li, figcaption { text-wrap: pretty; }
 .pen-color.active { border-color: var(--color-primary); background: var(--color-primary-highlight); }
 .pen-color:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .view.pen-surface-root { position: relative; touch-action: pan-x pan-y; }
+/* 스타일러스가 hover 중인 입력 위치에만 브라우저 패닝을 막아 획 이동을 받습니다.
+   손가락은 다른 영역에서 기존 페이지 스크롤을 계속 사용할 수 있습니다. */
+.pen-touch-ready { touch-action: none !important; }
 .pen-surface-canvas { position: absolute; top: 0; left: 0; z-index: 20; display: block; pointer-events: none; }
 .pen-hover-target { transform-origin: center center; transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1); }
 .pen-hover-target.pen-hover {
@@ -5024,6 +5037,7 @@ var PREDICT_EXAMS = [
     var color = /^#[0-9a-f]{6}$/i.test(options.color || '') ? options.color : DEFAULT_COLOR;
     var activeStroke = null, activePointerId = null, redoStack = [];
     var toolbar = root, ratio = 1, logicalWidth = 0, resizeObserver = null;
+    var lastSampleTime = 0;
     var canvas = document.createElement('canvas');
     canvas.className = 'pen-surface-canvas';
     canvas.setAttribute('aria-hidden', 'true');
@@ -5119,10 +5133,38 @@ var PREDICT_EXAMS = [
       if (!target || !target.closest) return false;
       return !!target.closest('button, a, input, textarea, select, summary, [role="button"], .pen-bar, [data-no-pen]');
     }
+
+    function appendSamples(event) {
+      if (!activeStroke) return;
+      var samples = [event];
+      if (typeof event.getCoalescedEvents === 'function') {
+        try {
+          var coalesced = event.getCoalescedEvents();
+          if (coalesced && coalesced.length) samples = coalesced;
+        } catch (ignore) {}
+      }
+      var changed = false;
+      samples.forEach(function (sample) {
+        var time = Number(sample.timeStamp) || 0;
+        if (time && lastSampleTime && time <= lastSampleTime) return;
+        var point = pointFromEvent(sample);
+        var previous = activeStroke.p[activeStroke.p.length - 1];
+        if (previous && Math.abs(previous[0] - point[0]) < 0.1 && Math.abs(previous[1] - point[1]) < 0.1) {
+          if (time) lastSampleTime = Math.max(lastSampleTime, time);
+          return;
+        }
+        activeStroke.p.push(point);
+        if (time) lastSampleTime = time;
+        changed = true;
+      });
+      if (changed) redraw();
+    }
+
     function onPointerDown(event) {
       if (event.pointerType !== 'pen' || mode === 'off' || activeStroke || isControlTarget(event.target)) return;
       if (event.cancelable) event.preventDefault();
       activePointerId = event.pointerId;
+      lastSampleTime = Number(event.timeStamp) || 0;
       activeStroke = { t: mode === 'eraser' ? 'e' : 'p', c: color, u: 1, w: logicalWidth, p: [pointFromEvent(event)] };
       try { root.setPointerCapture(event.pointerId); } catch (ignore) {}
       redraw();
@@ -5130,26 +5172,35 @@ var PREDICT_EXAMS = [
     function onPointerMove(event) {
       if (!activeStroke || event.pointerId !== activePointerId) return;
       if (event.cancelable) event.preventDefault();
-      var events = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
-      if (!events || !events.length) events = [event];
-      events.forEach(function (sample) { activeStroke.p.push(pointFromEvent(sample)); });
-      redraw();
+      appendSamples(event);
     }
     function finish(event) {
       if (!activeStroke || (event && event.pointerId !== activePointerId)) return;
-      var completed = activeStroke; activeStroke = null; activePointerId = null;
+      if (event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) appendSamples(event);
+      var completed = activeStroke;
+      activeStroke = null; activePointerId = null; lastSampleTime = 0;
       getStrokes().push(completed); redoStack = []; save(); redraw();
     }
     function cancel(event) {
       if (!activeStroke || (event && event.pointerId !== activePointerId)) return;
-      activeStroke = null; activePointerId = null; redraw();
+      var interrupted = activeStroke;
+      activeStroke = null; activePointerId = null; lastSampleTime = 0;
+      /* 입력이 중단되어도 실제 이동이 있었던 획은 보존합니다. */
+      if (interrupted.p.length > 1) {
+        getStrokes().push(interrupted); redoStack = []; save();
+      }
+      redraw();
     }
 
-    root.addEventListener('pointerdown', onPointerDown, true);
-    root.addEventListener('pointermove', onPointerMove, true);
-    root.addEventListener('pointerup', finish, true);
-    root.addEventListener('pointercancel', cancel, true);
-    root.addEventListener('lostpointercapture', cancel, true);
+    var nonPassiveCapture = { capture: true, passive: false };
+    root.addEventListener('pointerdown', onPointerDown, nonPassiveCapture);
+    /* 포인터 캡처가 일부 모바일 브라우저에서 불안정해도 이동 이벤트를 놓치지 않도록
+       document 단계에서 추적합니다. pointerrawupdate는 고주사율 펜 입력의 보조 경로입니다. */
+    document.addEventListener('pointermove', onPointerMove, nonPassiveCapture);
+    document.addEventListener('pointerrawupdate', onPointerMove, nonPassiveCapture);
+    document.addEventListener('pointerup', finish, true);
+    document.addEventListener('pointercancel', cancel, true);
+    document.addEventListener('lostpointercapture', cancel, true);
     toolbar.querySelectorAll('[data-penmode]').forEach(function (button) {
       button.addEventListener('click', function () { setMode(button.dataset.penmode); });
     });
@@ -5182,10 +5233,11 @@ var PREDICT_EXAMS = [
       window.removeEventListener('resize', resize);
       if (resizeObserver) resizeObserver.disconnect();
       root.removeEventListener('pointerdown', onPointerDown, true);
-      root.removeEventListener('pointermove', onPointerMove, true);
-      root.removeEventListener('pointerup', finish, true);
-      root.removeEventListener('pointercancel', cancel, true);
-      root.removeEventListener('lostpointercapture', cancel, true);
+      document.removeEventListener('pointermove', onPointerMove, true);
+      document.removeEventListener('pointerrawupdate', onPointerMove, true);
+      document.removeEventListener('pointerup', finish, true);
+      document.removeEventListener('pointercancel', cancel, true);
+      document.removeEventListener('lostpointercapture', cancel, true);
       try { if (activePointerId !== null) root.releasePointerCapture(activePointerId); } catch (ignore) {}
       if (canvas.parentNode === root) root.removeChild(canvas);
       root.classList.remove('pen-surface-root'); root._penToolsCleanup = null;
@@ -5838,30 +5890,77 @@ var PREDICT_EXAMS = [
 
   var CHOICE_LABELS = ['①', '②', '③', '④', '⑤'];
 
-  /* 펜이 화면에 닿지 않은 상태의 pointermove를 받아 공통 호버 UI를 제공합니다. */
+  /* 스타일러스 호버 확대와 펜 입력 준비를 공통 처리합니다. */
   (function bindStylusHover() {
-    var activeTarget = null;
+    var activeTarget = null, touchTarget = null, activePenPointerId = null;
     var selector = 'button:not(:disabled), a[href], [role="button"], .unit-card, .exam-card, .choice, .pq-choice, .omr-cell, .ctab, .cmd-btn, .grow-btn';
-    function clear() {
+
+    function clearHover() {
       if (activeTarget) activeTarget.classList.remove('pen-hover');
       activeTarget = null;
     }
-    function update(target) {
+    function setTouchTarget(target) {
+      var root = target && target.closest ? target.closest('.pen-surface-root') : null;
+      var next = root ? target : null;
+      /* touch-action은 일반 inline 요소에는 적용되지 않으므로 실제 박스가 있는 부모에 둡니다. */
+      while (next && next !== root) {
+        var display = window.getComputedStyle(next).display;
+        if (display !== 'inline' && display !== 'contents') break;
+        next = next.parentElement;
+      }
+      if (next === touchTarget) return;
+      if (touchTarget) touchTarget.classList.remove('pen-touch-ready');
+      touchTarget = next;
+      if (touchTarget) touchTarget.classList.add('pen-touch-ready');
+    }
+    function update(target, pointerType) {
       var next = target && target.closest ? target.closest(selector) : null;
-      if (next === activeTarget) return;
-      clear();
-      activeTarget = next;
-      if (activeTarget) activeTarget.classList.add('pen-hover-target', 'pen-hover');
+      if (next !== activeTarget) {
+        clearHover();
+        activeTarget = next;
+        if (activeTarget) activeTarget.classList.add('pen-hover-target', 'pen-hover');
+      }
+      if (pointerType === 'pen') setTouchTarget(target);
+      else if (activePenPointerId === null) setTouchTarget(null);
+    }
+    function hitTest(event) {
+      if (typeof document.elementFromPoint === 'function') {
+        return document.elementFromPoint(event.clientX, event.clientY) || event.target;
+      }
+      return event.target;
     }
     document.addEventListener('pointermove', function (event) {
-      if (event.pointerType === 'pen' && event.buttons === 0) update(event.target);
-      else clear();
+      /* 일부 태블릿 브라우저는 스타일러스를 mouse로 보고하기도 합니다.
+         touch 입력은 hover 이동을 발생시키지 않으므로 pen/mouse만 처리합니다. */
+      if ((event.pointerType === 'pen' || event.pointerType === 'mouse') && event.buttons === 0) {
+        update(hitTest(event), event.pointerType);
+      } else {
+        clearHover();
+      }
     }, true);
-    document.addEventListener('pointerdown', clear, true);
+    document.addEventListener('pointerdown', function (event) {
+      clearHover();
+      if (event.pointerType === 'pen') activePenPointerId = event.pointerId;
+    }, true);
+    function endPenPointer(event) {
+      if (activePenPointerId !== null && event.pointerId === activePenPointerId) {
+        activePenPointerId = null;
+        setTouchTarget(null);
+      }
+    }
+    document.addEventListener('pointerup', endPenPointer, true);
+    document.addEventListener('pointercancel', endPenPointer, true);
     document.addEventListener('pointerout', function (event) {
-      if (event.pointerType === 'pen' && !event.relatedTarget) clear();
+      if (event.pointerType === 'pen' && !event.relatedTarget) {
+        clearHover();
+        if (activePenPointerId === null) setTouchTarget(null);
+      }
     }, true);
-    window.addEventListener('blur', clear);
+    window.addEventListener('blur', function () {
+      activePenPointerId = null;
+      clearHover();
+      setTouchTarget(null);
+    });
   })();
 
   function getSelectedSubject() {
