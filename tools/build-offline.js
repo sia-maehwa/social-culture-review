@@ -101,23 +101,25 @@ function main() {
     'Missing empty assets/.nomedia; Android Gallery may index the exam JPG files.');
 
   let html = read('app-source.html');
+  const examApp = read('js/exam-app.js');
   assert(!html.includes('data-pplx-inline-edit'), 'Unexpected editor-injected script in app-source.html.');
   assert(html.includes('id="view-subject-select"'), 'The first-visit subject selection view is missing.');
 
   const dataCheck = validateQuestionData();
   const assetCheck = validateRuntimeAssets(dataCheck.exams);
 
-  assert(/<link\\b(?=[^>]*\\brel=["']stylesheet["'])[^>]*\\bhref=["']css\\/style\\.css["'][^>]*>/i.test(html),
+  assert(/<link\b(?=[^>]*\brel=["']stylesheet["'])[^>]*\bhref=["']css\/style\.css["'][^>]*>/i.test(html),
     'The source template must load the local css/style.css file.');
   for (const file of ['js/data.js', 'js/exams.js', 'js/storage.js', 'js/predict.js', 'js/game.js', 'js/pen-tools.js', 'js/exam-app.js', 'js/app.js']) {
     assert(html.includes('src="' + file + '"'), 'The source template is missing ' + file + '.');
   }
-  assert(html.includes("return 'assets/exams/'"), 'The source template must use ordinary relative exam-image paths.');
-  assert(!/https?:\\/\\//i.test(html.replace(/<link rel="icon" href="data:image\\/svg\\+xml,[^"]*"/, '')),
+  assert(examApp.includes("return 'assets/exams/'"),
+    'The exam renderer must use ordinary relative exam-image paths.');
+  assert(!/https?:\/\//i.test(html.replace(/<link rel="icon" href="data:image\/svg\+xml,[^"]*"/, '')),
     'The runtime template must not depend on an external URL.');
 
   html = html.replace('<title>사회문화 연습장 — 수능 개념 문제 연습</title>', '<title>사회문화 연습장</title>');
-  html = html.replace('<meta name="description"', '<meta name="app-runtime" content="local-files-no-network-api" />\\n<meta name="description"');
+  html = html.replace('<meta name="description"', '<meta name="app-runtime" content="local-static-files-no-network-api" />\n<meta name="description"');
   assert(Buffer.byteLength(html, 'utf8') < 100000, 'The shared entrypoint must stay below 100 KB.');
   write('index.html', html);
 
