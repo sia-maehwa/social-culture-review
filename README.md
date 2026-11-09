@@ -12,29 +12,25 @@
 - 빨강·파랑·검정·초록·보라·주황 6가지 펜 색상
 - 넓은 필기 영역, 영역 확대, 전체화면 집중 모드
 
-## Android 태블릿에서 파일 하나로 실행
+## Android 태블릿에서 로컬 실행
 
-최신 버전 동기화:
-
-```bash
-cd ~/storage/shared/study-app
-git pull --ff-only origin main
-```
-
-파일 관리자에서 **`study-app/offline/index.html`**을 Chrome으로 열면 됩니다. 실행용 HTML에는 CSS, JavaScript, 평가원 기출 이미지 300장이 모두 내장되어 있으므로 Python 서버나 인터넷 연결이 필요하지 않습니다.
-
-개발 원본(`index.html`, `css/`, `js/`, `assets/`)은 기능별 파일로 유지합니다. `scripts/build-offline.js`가 단일 HTML을 생성하며, GitHub Actions가 main 변경 시 `offline/index.html`을 자동으로 다시 빌드해 커밋합니다. 따라서 개발 소스를 수정해 push하면 실행용 HTML도 함께 갱신됩니다.
-
-## 개발 원본 실행이 필요한 경우
-
-개발용 원본은 여러 파일을 상대 경로로 불러오므로 Android Chrome의 `file://`보다 Termux 로컬 서버가 적합합니다.
+Android 파일 관리자에서 `index.html`만 직접 열면 브라우저의 `file://` 보안 정책 때문에 같은 폴더의 CSS·JavaScript·이미지를 불러오지 못할 수 있습니다. Termux의 로컬 서버 실행을 권장합니다.
 
 ```bash
 cd ~/storage/shared/study-app
 python -m http.server 8000 --bind 127.0.0.1
 ```
 
-Chrome에서 `http://127.0.0.1:8000/`을 엽니다. 서버는 태블릿 내부에서만 접속됩니다.
+Chrome 주소창에서 `http://127.0.0.1:8000/`을 엽니다. 서버를 종료할 때는 Termux에서 `Ctrl+C`를 누릅니다. 이 주소는 태블릿 내부에서만 접속되며 외부에 사이트를 공개하지 않습니다.
+
+## 업데이트
+
+```bash
+cd ~/storage/shared/study-app
+git pull --ff-only origin main
+```
+
+업데이트 후 브라우저에서 새로고침합니다. 로컬 학습 기록과 필기는 브라우저 저장소에 보관됩니다.
 
 ## 과목 구조
 
