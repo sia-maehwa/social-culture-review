@@ -11,6 +11,7 @@
     var color = /^#[0-9a-f]{6}$/i.test(options.color || '') ? options.color : DEFAULT_COLOR;
     var activeStroke = null, activePointerId = null, redoStack = [];
     var toolbar = root, ratio = 1, logicalWidth = 0, resizeObserver = null;
+    var lastSampleTime = 0;
     var canvas = document.createElement('canvas');
     canvas.className = 'pen-surface-canvas';
     canvas.setAttribute('aria-hidden', 'true');
@@ -106,10 +107,38 @@
       if (!target || !target.closest) return false;
       return !!target.closest('button, a, input, textarea, select, summary, [role="button"], .pen-bar, [data-no-pen]');
     }
+
+    function appendSamples(event) {
+      if (!activeStroke) return;
+      var samples = [event];
+      if (typeof event.getCoalescedEvents === 'function') {
+        try {
+          var coalesced = event.getCoalescedEvents();
+          if (coalesced && coalesced.length) samples = coalesced;
+        } catch (ignore) {}
+      }
+      var changed = false;
+      samples.forEach(function (sample) {
+        var time = Number(sample.timeStamp) || 0;
+        if (time && lastSampleTime && time <= lastSampleTime) return;
+        var point = pointFromEvent(sample);
+        var previous = activeStroke.p[activeStroke.p.length - 1];
+        if (previous && Math.abs(previous[0] - point[0]) < 0.1 && Math.abs(previous[1] - point[1]) < 0.1) {
+          if (time) lastSampleTime = Math.max(lastSampleTime, time);
+          return;
+        }
+        activeStroke.p.push(point);
+        if (time) lastSampleTime = time;
+        changed = true;
+      });
+      if (changed) redraw();
+    }
+
     function onPointerDown(event) {
       if (event.pointerType !== 'pen' || mode === 'off' || activeStroke || isControlTarget(event.target)) return;
       if (event.cancelable) event.preventDefault();
       activePointerId = event.pointerId;
+      lastSampleTime = Number(event.timeStamp) || 0;
       activeStroke = { t: mode === 'eraser' ? 'e' : 'p', c: color, u: 1, w: logicalWidth, p: [pointFromEvent(event)] };
       try { root.setPointerCapture(event.pointerId); } catch (ignore) {}
       redraw();
@@ -117,26 +146,35 @@
     function onPointerMove(event) {
       if (!activeStroke || event.pointerId !== activePointerId) return;
       if (event.cancelable) event.preventDefault();
-      var events = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
-      if (!events || !events.length) events = [event];
-      events.forEach(function (sample) { activeStroke.p.push(pointFromEvent(sample)); });
-      redraw();
+      appendSamples(event);
     }
     function finish(event) {
       if (!activeStroke || (event && event.pointerId !== activePointerId)) return;
-      var completed = activeStroke; activeStroke = null; activePointerId = null;
+      if (event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) appendSamples(event);
+      var completed = activeStroke;
+      activeStroke = null; activePointerId = null; lastSampleTime = 0;
       getStrokes().push(completed); redoStack = []; save(); redraw();
     }
     function cancel(event) {
       if (!activeStroke || (event && event.pointerId !== activePointerId)) return;
-      activeStroke = null; activePointerId = null; redraw();
+      var interrupted = activeStroke;
+      activeStroke = null; activePointerId = null; lastSampleTime = 0;
+      /* 입력이 중단되어도 실제 이동이 있었던 획은 보존합니다. */
+      if (interrupted.p.length > 1) {
+        getStrokes().push(interrupted); redoStack = []; save();
+      }
+      redraw();
     }
 
-    root.addEventListener('pointerdown', onPointerDown, true);
-    root.addEventListener('pointermove', onPointerMove, true);
-    root.addEventListener('pointerup', finish, true);
-    root.addEventListener('pointercancel', cancel, true);
-    root.addEventListener('lostpointercapture', cancel, true);
+    var nonPassiveCapture = { capture: true, passive: false };
+    root.addEventListener('pointerdown', onPointerDown, nonPassiveCapture);
+    /* 포인터 캡처가 일부 모바일 브라우저에서 불안정해도 이동 이벤트를 놓치지 않도록
+       document 단계에서 추적합니다. pointerrawupdate는 고주사율 펜 입력의 보조 경로입니다. */
+    document.addEventListener('pointermove', onPointerMove, nonPassiveCapture);
+    document.addEventListener('pointerrawupdate', onPointerMove, nonPassiveCapture);
+    document.addEventListener('pointerup', finish, true);
+    document.addEventListener('pointercancel', cancel, true);
+    document.addEventListener('lostpointercapture', cancel, true);
     toolbar.querySelectorAll('[data-penmode]').forEach(function (button) {
       button.addEventListener('click', function () { setMode(button.dataset.penmode); });
     });
@@ -169,10 +207,11 @@
       window.removeEventListener('resize', resize);
       if (resizeObserver) resizeObserver.disconnect();
       root.removeEventListener('pointerdown', onPointerDown, true);
-      root.removeEventListener('pointermove', onPointerMove, true);
-      root.removeEventListener('pointerup', finish, true);
-      root.removeEventListener('pointercancel', cancel, true);
-      root.removeEventListener('lostpointercapture', cancel, true);
+      document.removeEventListener('pointermove', onPointerMove, true);
+      document.removeEventListener('pointerrawupdate', onPointerMove, true);
+      document.removeEventListener('pointerup', finish, true);
+      document.removeEventListener('pointercancel', cancel, true);
+      document.removeEventListener('lostpointercapture', cancel, true);
       try { if (activePointerId !== null) root.releasePointerCapture(activePointerId); } catch (ignore) {}
       if (canvas.parentNode === root) root.removeChild(canvas);
       root.classList.remove('pen-surface-root'); root._penToolsCleanup = null;
