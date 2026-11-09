@@ -81,38 +81,31 @@
 
   var CHOICE_LABELS = ['①', '②', '③', '④', '⑤'];
 
-  /* 스타일러스 호버 확대와 펜 입력 준비를 공통 처리합니다. */
+  /* 스타일러스 hover와 펜 입력 시 브라우저 패닝 억제를 함께 처리합니다. */
   (function bindStylusHover() {
-    var activeTarget = null, touchTarget = null, activePenPointerId = null;
+    var activeTarget = null;
+    var lockedRoot = null;
     var selector = 'button:not(:disabled), a[href], [role="button"], .unit-card, .exam-card, .choice, .pq-choice, .omr-cell, .ctab, .cmd-btn, .grow-btn';
 
     function clearHover() {
       if (activeTarget) activeTarget.classList.remove('pen-hover');
       activeTarget = null;
     }
-    function setTouchTarget(target) {
-      var root = target && target.closest ? target.closest('.pen-surface-root') : null;
-      var next = root ? target : null;
-      /* touch-action은 일반 inline 요소에는 적용되지 않으므로 실제 박스가 있는 부모에 둡니다. */
-      while (next && next !== root) {
-        var display = window.getComputedStyle(next).display;
-        if (display !== 'inline' && display !== 'contents') break;
-        next = next.parentElement;
-      }
-      if (next === touchTarget) return;
-      if (touchTarget) touchTarget.classList.remove('pen-touch-ready');
-      touchTarget = next;
-      if (touchTarget) touchTarget.classList.add('pen-touch-ready');
+    function lockPenRoot(target) {
+      var nextRoot = target && target.closest ? target.closest('.pen-surface-root') : null;
+      if (nextRoot === lockedRoot) return;
+      if (lockedRoot) lockedRoot.classList.remove('pen-hover-input');
+      lockedRoot = nextRoot;
+      if (lockedRoot) lockedRoot.classList.add('pen-hover-input');
     }
-    function update(target, pointerType) {
+    function updateHover(target, pointerType) {
       var next = target && target.closest ? target.closest(selector) : null;
       if (next !== activeTarget) {
         clearHover();
         activeTarget = next;
         if (activeTarget) activeTarget.classList.add('pen-hover-target', 'pen-hover');
       }
-      if (pointerType === 'pen') setTouchTarget(target);
-      else if (activePenPointerId === null) setTouchTarget(null);
+      if (pointerType === 'pen') lockPenRoot(target);
     }
     function hitTest(event) {
       if (typeof document.elementFromPoint === 'function') {
@@ -120,37 +113,57 @@
       }
       return event.target;
     }
-    document.addEventListener('pointermove', function (event) {
-      /* 일부 태블릿 브라우저는 스타일러스를 mouse로 보고하기도 합니다.
-         touch 입력은 hover 이동을 발생시키지 않으므로 pen/mouse만 처리합니다. */
-      if ((event.pointerType === 'pen' || event.pointerType === 'mouse') && event.buttons === 0) {
-        update(hitTest(event), event.pointerType);
+    function handleMove(event, pointerType) {
+      if (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents) return;
+      var type = pointerType || event.pointerType;
+      if (type === 'pen' && event.buttons === 0) {
+        updateHover(hitTest(event), 'pen');
+      } else if (type === 'mouse' && event.buttons === 0) {
+        updateHover(hitTest(event), 'mouse');
+      } else if (type === 'pen') {
+        clearHover();
+        lockPenRoot(hitTest(event));
       } else {
         clearHover();
       }
+    }
+
+    document.addEventListener('pointerover', function (event) {
+      if (event.pointerType === 'pen' && event.buttons === 0) updateHover(hitTest(event), 'pen');
     }, true);
+    document.addEventListener('pointermove', function (event) { handleMove(event); }, true);
+
+    /* 구형/제조사 Android 입력 스택에서 hover를 mousemove로만 노출하는 경우의 보조 경로 */
+    document.addEventListener('mousemove', function (event) {
+      if (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents) return;
+      handleMove(event, 'mouse');
+    }, true);
+
     document.addEventListener('pointerdown', function (event) {
       clearHover();
-      if (event.pointerType === 'pen') activePenPointerId = event.pointerId;
+      if (event.pointerType === 'pen') lockPenRoot(event.target);
     }, true);
-    function endPenPointer(event) {
-      if (activePenPointerId !== null && event.pointerId === activePenPointerId) {
-        activePenPointerId = null;
-        setTouchTarget(null);
+    document.addEventListener('pointerup', function (event) {
+      if (event.pointerType === 'pen') {
+        var current = hitTest(event);
+        if (current && current.closest && current.closest('.pen-surface-root')) lockPenRoot(current);
       }
-    }
-    document.addEventListener('pointerup', endPenPointer, true);
-    document.addEventListener('pointercancel', endPenPointer, true);
+    }, true);
+    document.addEventListener('pointercancel', function (event) {
+      if (event.pointerType === 'pen') {
+        var current = hitTest(event);
+        if (current && current.closest && current.closest('.pen-surface-root')) lockPenRoot(current);
+      }
+    }, true);
     document.addEventListener('pointerout', function (event) {
       if (event.pointerType === 'pen' && !event.relatedTarget) {
         clearHover();
-        if (activePenPointerId === null) setTouchTarget(null);
+        lockPenRoot(null);
       }
     }, true);
     window.addEventListener('blur', function () {
-      activePenPointerId = null;
       clearHover();
-      setTouchTarget(null);
+      lockPenRoot(null);
     });
   })();
 
