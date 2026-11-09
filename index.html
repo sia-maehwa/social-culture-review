@@ -639,15 +639,31 @@ p, li, figcaption { text-wrap: pretty; }
 .pen-color.active { border-color: var(--color-primary); background: var(--color-primary-highlight); }
 .pen-color:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .view.pen-surface-root { position: relative; touch-action: pan-x pan-y; }
-/* 스타일러스가 hover 중인 입력 위치에만 브라우저 패닝을 막아 획 이동을 받습니다.
-   손가락은 다른 영역에서 기존 페이지 스크롤을 계속 사용할 수 있습니다. */
-.pen-touch-ready { touch-action: none !important; }
+/* 펜이 퀴즈 화면 안에 있는 동안에만 펜 입력을 우선합니다.
+   펜이 화면 밖으로 나가면 pan-x/pan-y가 복구되어 손가락 스크롤이 가능합니다. */
+.view.pen-surface-root.pen-hover-input,
+.view.pen-surface-root.pen-input-active { touch-action: none !important; user-select: none; -webkit-user-select: none; }
 .pen-surface-canvas { position: absolute; top: 0; left: 0; z-index: 20; display: block; pointer-events: none; }
-.pen-hover-target { transform-origin: center center; transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1); }
+.pen-hover-target { transform-origin: center center; transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1), background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
 .pen-hover-target.pen-hover {
   position: relative; z-index: 60;
   transform: translateY(-2px) scale(1.055);
   box-shadow: 0 10px 24px rgba(31, 39, 51, 0.18);
+}
+/* 선지 hover는 요청된 대로 파란색 강조와 확대를 동시에 표시합니다. */
+.choice.pen-hover-target.pen-hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-highlight);
+  color: var(--color-text);
+  transform: translateY(-2px) scale(1.055);
+  box-shadow: 0 8px 20px rgba(36, 86, 230, 0.22);
+}
+.pq-choice.pen-hover-target.pen-hover,
+.omr-cell.pen-hover-target.pen-hover,
+.ctab.pen-hover-target.pen-hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-highlight);
+  color: var(--color-primary);
 }
 .quiz-question-prompt { margin-bottom: var(--space-4); }
 .pen-input-hint { flex-basis: 100%; }
@@ -5024,20 +5040,24 @@ var PREDICT_EXAMS = [
 </script>
 <!-- Embedded source: js/pen-tools.js -->
 <script>
-/* 사회문화 연습장 — 화면 전체 스타일러스 필기 엔진
-   스타일러스는 필기하고, 손가락은 브라우저의 기본 화면 이동(스크롤)을 사용합니다. */
+/* 사회문화 연습장 — 스타일러스 입력 엔진 */
 (function () {
   'use strict';
   var DEFAULT_COLOR = '#d6336c';
+
   function bind(options) {
     var root = options.root;
     if (!root || !root.addEventListener || !root.appendChild) return null;
     if (root._penToolsCleanup) root._penToolsCleanup();
+
     var mode = options.mode || 'pen';
     var color = /^#[0-9a-f]{6}$/i.test(options.color || '') ? options.color : DEFAULT_COLOR;
-    var activeStroke = null, activePointerId = null, redoStack = [];
-    var toolbar = root, ratio = 1, logicalWidth = 0, resizeObserver = null;
-    var lastSampleTime = 0;
+    var activeStroke = null;
+    var activePointerId = null;
+    var redoStack = [];
+    var ratio = 1;
+    var logicalWidth = 0;
+    var resizeObserver = null;
     var canvas = document.createElement('canvas');
     canvas.className = 'pen-surface-canvas';
     canvas.setAttribute('aria-hidden', 'true');
@@ -5065,21 +5085,27 @@ var PREDICT_EXAMS = [
     }
     function drawStroke(stroke) {
       if (!stroke || !Array.isArray(stroke.p) || !stroke.p.length) return;
-      var ctx = canvas.getContext('2d'), erasing = stroke.t === 'e';
+      var ctx = canvas.getContext('2d');
+      var erasing = stroke.t === 'e';
       var strokeColor = stroke.c || DEFAULT_COLOR;
       ctx.save();
       ctx.globalCompositeOperation = erasing ? 'destination-out' : 'source-over';
       ctx.strokeStyle = strokeColor;
       ctx.fillStyle = strokeColor;
       ctx.lineWidth = erasing ? Math.max(26 * ratio, canvas.width / 38) : Math.max(2.8 * ratio, canvas.width / 480);
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       var first = strokePoint(stroke, stroke.p[0]);
       if (stroke.p.length === 1) {
-        ctx.beginPath(); ctx.arc(first[0], first[1], ctx.lineWidth / 2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(first[0], first[1], ctx.lineWidth / 2, 0, Math.PI * 2);
+        ctx.fill();
       } else {
-        ctx.beginPath(); ctx.moveTo(first[0], first[1]);
+        ctx.beginPath();
+        ctx.moveTo(first[0], first[1]);
         for (var i = 1; i < stroke.p.length; i++) {
-          var next = strokePoint(stroke, stroke.p[i]); ctx.lineTo(next[0], next[1]);
+          var nextPoint = strokePoint(stroke, stroke.p[i]);
+          ctx.lineTo(nextPoint[0], nextPoint[1]);
         }
         ctx.stroke();
       }
@@ -5101,19 +5127,21 @@ var PREDICT_EXAMS = [
       canvas.style.width = logicalWidth + 'px';
       canvas.style.height = logicalHeight + 'px';
       if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width; canvas.height = height; redraw();
+        canvas.width = width;
+        canvas.height = height;
+        redraw();
       }
     }
     function updateHistoryButtons() {
-      var undo = toolbar.querySelector('[data-penundo]');
-      var redo = toolbar.querySelector('[data-penredo]');
+      var undo = root.querySelector('[data-penundo]');
+      var redo = root.querySelector('[data-penredo]');
       if (undo) undo.disabled = getStrokes().length === 0;
       if (redo) redo.disabled = redoStack.length === 0;
     }
     function setMode(nextMode) {
       mode = nextMode;
       if (options.onModeChange) options.onModeChange(mode);
-      toolbar.querySelectorAll('[data-penmode]').forEach(function (button) {
+      root.querySelectorAll('[data-penmode]').forEach(function (button) {
         var active = button.dataset.penmode === mode;
         button.classList.toggle('active', active);
         button.setAttribute('aria-pressed', active ? 'true' : 'false');
@@ -5123,7 +5151,7 @@ var PREDICT_EXAMS = [
       if (!/^#[0-9a-f]{6}$/i.test(nextColor || '')) return;
       color = nextColor;
       if (options.onColorChange) options.onColorChange(color);
-      toolbar.querySelectorAll('[data-pencolor]').forEach(function (button) {
+      root.querySelectorAll('[data-pencolor]').forEach(function (button) {
         var active = button.dataset.pencolor.toLowerCase() === color.toLowerCase();
         button.classList.toggle('active', active);
         button.setAttribute('aria-pressed', active ? 'true' : 'false');
@@ -5133,118 +5161,157 @@ var PREDICT_EXAMS = [
       if (!target || !target.closest) return false;
       return !!target.closest('button, a, input, textarea, select, summary, [role="button"], .pen-bar, [data-no-pen]');
     }
-
+    function lastPoint() {
+      if (!activeStroke || !activeStroke.p.length) return null;
+      return activeStroke.p[activeStroke.p.length - 1];
+    }
+    function appendPoint(sample) {
+      if (!activeStroke || !Number.isFinite(sample.clientX) || !Number.isFinite(sample.clientY)) return false;
+      var point = pointFromEvent(sample);
+      var previous = lastPoint();
+      /* Android 일부 펌웨어는 event.timeStamp 정밀도가 낮거나 샘플 간 시간이 겹칩니다.
+         시간값으로 획을 버리지 않고 실제 좌표 중복만 제거합니다. */
+      if (previous && Math.abs(previous[0] - point[0]) < 0.25 && Math.abs(previous[1] - point[1]) < 0.25) return false;
+      activeStroke.p.push(point);
+      return true;
+    }
     function appendSamples(event) {
       if (!activeStroke) return;
-      var samples = [event];
+      var samples = [];
       if (typeof event.getCoalescedEvents === 'function') {
-        try {
-          var coalesced = event.getCoalescedEvents();
-          if (coalesced && coalesced.length) samples = coalesced;
-        } catch (ignore) {}
+        try { samples = event.getCoalescedEvents() || []; } catch (ignore) { samples = []; }
       }
       var changed = false;
-      samples.forEach(function (sample) {
-        var time = Number(sample.timeStamp) || 0;
-        if (time && lastSampleTime && time <= lastSampleTime) return;
-        var point = pointFromEvent(sample);
-        var previous = activeStroke.p[activeStroke.p.length - 1];
-        if (previous && Math.abs(previous[0] - point[0]) < 0.1 && Math.abs(previous[1] - point[1]) < 0.1) {
-          if (time) lastSampleTime = Math.max(lastSampleTime, time);
-          return;
-        }
-        activeStroke.p.push(point);
-        if (time) lastSampleTime = time;
-        changed = true;
-      });
+      for (var i = 0; i < samples.length; i++) changed = appendPoint(samples[i]) || changed;
+      /* getCoalescedEvents()가 비었거나 마지막 샘플이 현재 좌표보다 앞서 있으면 최종 좌표도 넣습니다. */
+      changed = appendPoint(event) || changed;
       if (changed) redraw();
+    }
+    function isInsideRoot(target) {
+      return !!(target && (target === root || (root.contains && root.contains(target))));
     }
 
     function onPointerDown(event) {
-      if (event.pointerType !== 'pen' || mode === 'off' || activeStroke || isControlTarget(event.target)) return;
-      if (event.cancelable) event.preventDefault();
+      if (event.pointerType !== 'pen' || mode === 'off' || activeStroke) return;
+      if (!isInsideRoot(event.target) || isControlTarget(event.target)) return;
+
       activePointerId = event.pointerId;
-      lastSampleTime = Number(event.timeStamp) || 0;
-      activeStroke = { t: mode === 'eraser' ? 'e' : 'p', c: color, u: 1, w: logicalWidth, p: [pointFromEvent(event)] };
+      activeStroke = {
+        t: mode === 'eraser' ? 'e' : 'p',
+        c: color,
+        u: 1,
+        w: logicalWidth,
+        p: [pointFromEvent(event)]
+      };
+      root.classList.add('pen-input-active');
       try { root.setPointerCapture(event.pointerId); } catch (ignore) {}
       redraw();
+      /* pointerdown은 취소하지 않습니다. 일부 Android Chrome이 생성하는 보조 mousemove
+         이벤트도 아래 fallback 입력 경로에서 사용할 수 있게 둡니다. */
     }
     function onPointerMove(event) {
       if (!activeStroke || event.pointerId !== activePointerId) return;
-      if (event.cancelable) event.preventDefault();
+      appendSamples(event);
+    }
+    function onMouseMoveFallback(event) {
+      if (!activeStroke) return;
+      if (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents) return;
       appendSamples(event);
     }
     function finish(event) {
       if (!activeStroke || (event && event.pointerId !== activePointerId)) return;
       if (event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) appendSamples(event);
       var completed = activeStroke;
-      activeStroke = null; activePointerId = null; lastSampleTime = 0;
-      getStrokes().push(completed); redoStack = []; save(); redraw();
+      activeStroke = null;
+      activePointerId = null;
+      root.classList.remove('pen-input-active');
+      getStrokes().push(completed);
+      redoStack = [];
+      save();
+      redraw();
     }
     function cancel(event) {
       if (!activeStroke || (event && event.pointerId !== activePointerId)) return;
+      /* 브라우저의 pointercancel/pointer capture 해제도 마지막으로 수신한 부분 획은 저장합니다. */
       var interrupted = activeStroke;
-      activeStroke = null; activePointerId = null; lastSampleTime = 0;
-      /* 입력이 중단되어도 실제 이동이 있었던 획은 보존합니다. */
-      if (interrupted.p.length > 1) {
-        getStrokes().push(interrupted); redoStack = []; save();
+      activeStroke = null;
+      activePointerId = null;
+      root.classList.remove('pen-input-active');
+      if (interrupted.p.length) {
+        getStrokes().push(interrupted);
+        redoStack = [];
+        save();
       }
       redraw();
     }
 
-    var nonPassiveCapture = { capture: true, passive: false };
-    root.addEventListener('pointerdown', onPointerDown, nonPassiveCapture);
-    /* 포인터 캡처가 일부 모바일 브라우저에서 불안정해도 이동 이벤트를 놓치지 않도록
-       document 단계에서 추적합니다. pointerrawupdate는 고주사율 펜 입력의 보조 경로입니다. */
-    document.addEventListener('pointermove', onPointerMove, nonPassiveCapture);
-    document.addEventListener('pointerrawupdate', onPointerMove, nonPassiveCapture);
+    var capture = { capture: true, passive: false };
+    document.addEventListener('pointerdown', onPointerDown, capture);
+    document.addEventListener('pointermove', onPointerMove, capture);
+    document.addEventListener('mousemove', onMouseMoveFallback, true);
     document.addEventListener('pointerup', finish, true);
     document.addEventListener('pointercancel', cancel, true);
     document.addEventListener('lostpointercapture', cancel, true);
-    toolbar.querySelectorAll('[data-penmode]').forEach(function (button) {
+
+    root.querySelectorAll('[data-penmode]').forEach(function (button) {
       button.addEventListener('click', function () { setMode(button.dataset.penmode); });
     });
-    toolbar.querySelectorAll('[data-pencolor]').forEach(function (button) {
+    root.querySelectorAll('[data-pencolor]').forEach(function (button) {
       button.addEventListener('click', function () { setColor(button.dataset.pencolor); });
     });
-    var undoButton = toolbar.querySelector('[data-penundo]');
+    var undoButton = root.querySelector('[data-penundo]');
     if (undoButton) undoButton.addEventListener('click', function () {
-      var strokes = getStrokes(); if (!strokes.length) return;
-      redoStack.push(strokes.pop()); save(); redraw();
+      var strokes = getStrokes();
+      if (!strokes.length) return;
+      redoStack.push(strokes.pop());
+      save();
+      redraw();
     });
-    var redoButton = toolbar.querySelector('[data-penredo]');
+    var redoButton = root.querySelector('[data-penredo]');
     if (redoButton) redoButton.addEventListener('click', function () {
       if (!redoStack.length) return;
-      getStrokes().push(redoStack.pop()); save(); redraw();
+      getStrokes().push(redoStack.pop());
+      save();
+      redraw();
     });
-    var clearButton = toolbar.querySelector('[data-penclear]');
+    var clearButton = root.querySelector('[data-penclear]');
     if (clearButton) clearButton.addEventListener('click', function () {
       if (!getStrokes().length) return;
       if (!window.confirm(options.clearMessage || '이 문항의 필기를 모두 지울까요?')) return;
-      getStrokes().length = 0; redoStack = []; save(); redraw();
+      getStrokes().length = 0;
+      redoStack = [];
+      save();
+      redraw();
     });
+
     window.addEventListener('resize', resize);
     if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(resize); resizeObserver.observe(root);
+      resizeObserver = new ResizeObserver(resize);
+      resizeObserver.observe(root);
     }
-    resize(); setMode(mode); setColor(color); redraw();
+    resize();
+    setMode(mode);
+    setColor(color);
+    redraw();
 
     function destroy() {
       window.removeEventListener('resize', resize);
       if (resizeObserver) resizeObserver.disconnect();
-      root.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('pointermove', onPointerMove, true);
-      document.removeEventListener('pointerrawupdate', onPointerMove, true);
+      document.removeEventListener('mousemove', onMouseMoveFallback, true);
       document.removeEventListener('pointerup', finish, true);
       document.removeEventListener('pointercancel', cancel, true);
       document.removeEventListener('lostpointercapture', cancel, true);
       try { if (activePointerId !== null) root.releasePointerCapture(activePointerId); } catch (ignore) {}
       if (canvas.parentNode === root) root.removeChild(canvas);
-      root.classList.remove('pen-surface-root'); root._penToolsCleanup = null;
+      root.classList.remove('pen-surface-root', 'pen-input-active');
+      root._penToolsCleanup = null;
     }
     root._penToolsCleanup = destroy;
     return { redraw: redraw, resize: resize, setMode: setMode, setColor: setColor, destroy: destroy };
   }
+
   window.PenTools = { bind: bind };
 })();
 
@@ -5890,38 +5957,31 @@ var PREDICT_EXAMS = [
 
   var CHOICE_LABELS = ['①', '②', '③', '④', '⑤'];
 
-  /* 스타일러스 호버 확대와 펜 입력 준비를 공통 처리합니다. */
+  /* 스타일러스 hover와 펜 입력 시 브라우저 패닝 억제를 함께 처리합니다. */
   (function bindStylusHover() {
-    var activeTarget = null, touchTarget = null, activePenPointerId = null;
+    var activeTarget = null;
+    var lockedRoot = null;
     var selector = 'button:not(:disabled), a[href], [role="button"], .unit-card, .exam-card, .choice, .pq-choice, .omr-cell, .ctab, .cmd-btn, .grow-btn';
 
     function clearHover() {
       if (activeTarget) activeTarget.classList.remove('pen-hover');
       activeTarget = null;
     }
-    function setTouchTarget(target) {
-      var root = target && target.closest ? target.closest('.pen-surface-root') : null;
-      var next = root ? target : null;
-      /* touch-action은 일반 inline 요소에는 적용되지 않으므로 실제 박스가 있는 부모에 둡니다. */
-      while (next && next !== root) {
-        var display = window.getComputedStyle(next).display;
-        if (display !== 'inline' && display !== 'contents') break;
-        next = next.parentElement;
-      }
-      if (next === touchTarget) return;
-      if (touchTarget) touchTarget.classList.remove('pen-touch-ready');
-      touchTarget = next;
-      if (touchTarget) touchTarget.classList.add('pen-touch-ready');
+    function lockPenRoot(target) {
+      var nextRoot = target && target.closest ? target.closest('.pen-surface-root') : null;
+      if (nextRoot === lockedRoot) return;
+      if (lockedRoot) lockedRoot.classList.remove('pen-hover-input');
+      lockedRoot = nextRoot;
+      if (lockedRoot) lockedRoot.classList.add('pen-hover-input');
     }
-    function update(target, pointerType) {
+    function updateHover(target, pointerType) {
       var next = target && target.closest ? target.closest(selector) : null;
       if (next !== activeTarget) {
         clearHover();
         activeTarget = next;
         if (activeTarget) activeTarget.classList.add('pen-hover-target', 'pen-hover');
       }
-      if (pointerType === 'pen') setTouchTarget(target);
-      else if (activePenPointerId === null) setTouchTarget(null);
+      if (pointerType === 'pen') lockPenRoot(target);
     }
     function hitTest(event) {
       if (typeof document.elementFromPoint === 'function') {
@@ -5929,37 +5989,57 @@ var PREDICT_EXAMS = [
       }
       return event.target;
     }
-    document.addEventListener('pointermove', function (event) {
-      /* 일부 태블릿 브라우저는 스타일러스를 mouse로 보고하기도 합니다.
-         touch 입력은 hover 이동을 발생시키지 않으므로 pen/mouse만 처리합니다. */
-      if ((event.pointerType === 'pen' || event.pointerType === 'mouse') && event.buttons === 0) {
-        update(hitTest(event), event.pointerType);
+    function handleMove(event, pointerType) {
+      if (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents) return;
+      var type = pointerType || event.pointerType;
+      if (type === 'pen' && event.buttons === 0) {
+        updateHover(hitTest(event), 'pen');
+      } else if (type === 'mouse' && event.buttons === 0) {
+        updateHover(hitTest(event), 'mouse');
+      } else if (type === 'pen') {
+        clearHover();
+        lockPenRoot(hitTest(event));
       } else {
         clearHover();
       }
+    }
+
+    document.addEventListener('pointerover', function (event) {
+      if (event.pointerType === 'pen' && event.buttons === 0) updateHover(hitTest(event), 'pen');
     }, true);
+    document.addEventListener('pointermove', function (event) { handleMove(event); }, true);
+
+    /* 구형/제조사 Android 입력 스택에서 hover를 mousemove로만 노출하는 경우의 보조 경로 */
+    document.addEventListener('mousemove', function (event) {
+      if (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents) return;
+      handleMove(event, 'mouse');
+    }, true);
+
     document.addEventListener('pointerdown', function (event) {
       clearHover();
-      if (event.pointerType === 'pen') activePenPointerId = event.pointerId;
+      if (event.pointerType === 'pen') lockPenRoot(event.target);
     }, true);
-    function endPenPointer(event) {
-      if (activePenPointerId !== null && event.pointerId === activePenPointerId) {
-        activePenPointerId = null;
-        setTouchTarget(null);
+    document.addEventListener('pointerup', function (event) {
+      if (event.pointerType === 'pen') {
+        var current = hitTest(event);
+        if (current && current.closest && current.closest('.pen-surface-root')) lockPenRoot(current);
       }
-    }
-    document.addEventListener('pointerup', endPenPointer, true);
-    document.addEventListener('pointercancel', endPenPointer, true);
+    }, true);
+    document.addEventListener('pointercancel', function (event) {
+      if (event.pointerType === 'pen') {
+        var current = hitTest(event);
+        if (current && current.closest && current.closest('.pen-surface-root')) lockPenRoot(current);
+      }
+    }, true);
     document.addEventListener('pointerout', function (event) {
       if (event.pointerType === 'pen' && !event.relatedTarget) {
         clearHover();
-        if (activePenPointerId === null) setTouchTarget(null);
+        lockPenRoot(null);
       }
     }, true);
     window.addEventListener('blur', function () {
-      activePenPointerId = null;
       clearHover();
-      setTouchTarget(null);
+      lockPenRoot(null);
     });
   })();
 
