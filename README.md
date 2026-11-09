@@ -31,7 +31,7 @@ GitHub Pages에서 main 브랜치의 저장소 루트를 게시합니다. index.
 
 ## 브랜치 보호
 
-.github/CODEOWNERS로 코드 소유자를 지정하고 .github/workflows/quality-check.yml이 PR 및 main push 때 JavaScript 구문과 로컬 파일 참조를 검사합니다. 저장소 Settings → Rules → Rulesets에서 main 대상 활성 Ruleset을 만들고 PR 필수(승인 1회), Code Owner 검토 필수, Required status check "JavaScript syntax / validate", Force push 및 브랜치 삭제 차단을 켜야 실제 보호가 적용됩니다.
+.github/CODEOWNERS로 코드 소유자를 지정하고 .github/workflows/quality-check.yml이 PR 및 main push 때 JavaScript 구문과 로컬 파일 참조를 검사합니다. 저장소 Settings → Rules → Rulesets에서 main 대상 활성 Ruleset을 만들고 PR 필수(승인 1회), Code Owner 검토 필수, Required status check "quality-check / validate", Force push 및 브랜치 삭제 차단을 켜야 실제 보호가 적용됩니다.
 
 현재 연결 도구는 GitHub Ruleset 생성·활성화 기능을 제공하지 않아 관리자 화면에서 마지막 설정을 적용해야 합니다.
 
