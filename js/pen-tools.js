@@ -205,8 +205,7 @@
       root.classList.add('pen-input-active');
       try { root.setPointerCapture(event.pointerId); } catch (ignore) {}
       drawDot(activeStroke, activeStroke.p[0]);
-      /* pointerdown은 취소하지 않습니다. 일부 Android Chrome이 생성하는 보조 mousemove
-         이벤트도 아래 fallback 입력 경로에서 사용할 수 있게 둡니다. */
+      /* 펜 입력은 pointermove/getCoalescedEvents 단일 경로로 수집합니다. */
     }
     function onPointerMove(event) {
       if (!activeStroke || event.pointerId !== activePointerId) return;
@@ -229,7 +228,7 @@
     }
     function cancel(event) {
       if (!activeStroke || (event && event.pointerId !== activePointerId)) return;
-      /* 브라우저의 pointercancel/pointer capture 해제도 마지막으로 수신한 부분 획은 저장합니다. */
+      /* 브라우저가 실제 pointercancel을 보냈을 때 수신한 부분 획을 보존합니다. */
       var interrupted = activeStroke;
       activeStroke = null;
       activePointerId = null;
@@ -248,7 +247,7 @@
     document.addEventListener('pointermove', onPointerMove, capture);
     document.addEventListener('pointerup', finish, true);
     document.addEventListener('pointercancel', cancel, true);
-    /* lostpointercapture만으로 획을 끝내지 않습니다. 실제 pointerup 또는 pointercancel에서만 끝냅니다. */
+    /* 포인터 캡처가 해제되어도 실제 pointerup 또는 pointercancel 전까지 추적을 유지합니다. */
 
     root.querySelectorAll('[data-penmode]').forEach(function (button) {
       button.addEventListener('click', function () { setMode(button.dataset.penmode); });
