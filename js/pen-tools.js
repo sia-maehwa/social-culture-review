@@ -3,12 +3,15 @@
 (function () {
   'use strict';
 
+  var DEFAULT_COLOR = '#d6336c';
+
   function bind(options) {
     var root = options.root;
     var canvas = options.canvas;
     if (!root || !canvas || !canvas.getContext) return null;
 
     var mode = options.mode || 'pen';
+    var color = /^#[0-9a-f]{6}$/i.test(options.color || '') ? options.color : DEFAULT_COLOR;
     var activeStroke = null;
     var activePointerId = null;
     var redoStack = [];
@@ -39,8 +42,9 @@
       var erasing = stroke.t === 'e';
       ctx.save();
       ctx.globalCompositeOperation = erasing ? 'destination-out' : 'source-over';
-      ctx.strokeStyle = '#d6336c';
-      ctx.fillStyle = '#d6336c';
+      var strokeColor = stroke.c || DEFAULT_COLOR;
+      ctx.strokeStyle = strokeColor;
+      ctx.fillStyle = strokeColor;
       ctx.lineWidth = erasing ? Math.max(18, canvas.width / 22) : Math.max(2.5, canvas.width / 420);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -77,6 +81,17 @@
       });
     }
 
+    function setColor(nextColor) {
+      if (!/^#[0-9a-f]{6}$/i.test(nextColor || '')) return;
+      color = nextColor;
+      if (options.onColorChange) options.onColorChange(color);
+      toolbar.querySelectorAll('[data-pencolor]').forEach(function (button) {
+        var active = button.dataset.pencolor.toLowerCase() === color.toLowerCase();
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    }
+
     function updateHistoryButtons() {
       var undo = toolbar.querySelector('[data-penundo]');
       var redo = toolbar.querySelector('[data-penredo]');
@@ -91,6 +106,7 @@
       activePointerId = event.pointerId;
       activeStroke = {
         t: mode === 'eraser' ? 'e' : 'p',
+        c: color,
         p: [pointFromEvent(event)]
       };
       try { canvas.setPointerCapture(event.pointerId); } catch (ignore) {}
@@ -105,7 +121,7 @@
       events.forEach(function (sample) {
         var next = pointFromEvent(sample);
         activeStroke.p.push(next);
-        drawStroke({ t: activeStroke.t, p: [last, next] });
+        drawStroke({ t: activeStroke.t, c: activeStroke.c, p: [last, next] });
         last = next;
       });
     });
@@ -128,6 +144,10 @@
 
     toolbar.querySelectorAll('[data-penmode]').forEach(function (button) {
       button.addEventListener('click', function () { setMode(button.dataset.penmode); });
+    });
+
+    toolbar.querySelectorAll('[data-pencolor]').forEach(function (button) {
+      button.addEventListener('click', function () { setColor(button.dataset.pencolor); });
     });
 
     var undoButton = toolbar.querySelector('[data-penundo]');
@@ -158,8 +178,9 @@
     });
 
     setMode(mode);
+    setColor(color);
     redraw();
-    return { redraw: redraw, setMode: setMode };
+    return { redraw: redraw, setMode: setMode, setColor: setColor };
   }
 
   window.PenTools = { bind: bind };

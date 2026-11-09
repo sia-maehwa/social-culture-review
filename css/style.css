@@ -590,6 +590,11 @@ p, li, figcaption { text-wrap: pretty; }
 }
 .pen-tool:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .pen-tool.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.pen-palette { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; border: 1px solid var(--color-border); border-radius: 999px; }
+.pen-color { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 3px; border: 1px solid transparent; border-radius: 50%; background: transparent; cursor: pointer; }
+.pen-color i { display: block; width: 16px; height: 16px; border: 1px solid #0002; border-radius: 50%; }
+.pen-color.active { border-color: var(--color-primary); background: var(--color-primary-highlight); }
+.pen-color:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .exam-qwrap { position: relative; }
 .qimg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: pan-y; cursor: crosshair; }
 .exam-memo { margin-top: var(--space-4); }

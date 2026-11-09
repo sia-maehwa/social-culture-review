@@ -9,6 +9,8 @@
   var HIST_KEY = 'socmul_exam_hist_v1';
   var NODOYO_KEY = 'socmul_nodopyo_v1';
   var PEN_KEY = 'socmul_pen_v1';
+  var PEN_COLOR_KEY = 'socmul_pen_color_v1';
+  var DEFAULT_PEN_COLOR = '#d6336c';
 
   var state = {
     examId: null,
@@ -19,6 +21,7 @@
     submitted: false,
     history: [],      /* { id, score, max, correct, total, at } */
     penMode: 'pen',   /* pen | eraser | off */
+    penColor: (window.Store && window.Store.get(PEN_COLOR_KEY)) || DEFAULT_PEN_COLOR,
     strokes: {},      /* { 문항인덱스: [stroke, ...] } */
   };
 
@@ -260,11 +263,15 @@
 
   /* ─── 펜 필기 ─── */
   function penBarHtml() {
+    var colors = [['#d6336c', '빨강'], ['#2563eb', '파랑'], ['#20252b', '검정'], ['#16a34a', '초록'], ['#9333ea', '보라'], ['#ea580c', '주황']];
     return '<div class="pen-bar" aria-label="필기 도구">' +
       '<span class="pen-bar-label">필기 도구</span>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'pen' ? ' active' : '') + '" data-penmode="pen" aria-pressed="' + (state.penMode === 'pen') + '">펜</button>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'eraser' ? ' active' : '') + '" data-penmode="eraser" aria-pressed="' + (state.penMode === 'eraser') + '">지우개</button>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'off' ? ' active' : '') + '" data-penmode="off" aria-pressed="' + (state.penMode === 'off') + '">필기 끄기</button>' +
+      '<span class="pen-palette" role="group" aria-label="펜 색상">' + colors.map(function (item) {
+        return '<button type="button" class="pen-color' + (state.penColor === item[0] ? ' active' : '') + '" data-pencolor="' + item[0] + '" aria-label="' + item[1] + '" title="' + item[1] + '" aria-pressed="' + (state.penColor === item[0]) + '"><i style="background:' + item[0] + '"></i></button>';
+      }).join('') + '</span>' +
       '<button type="button" class="pen-tool" data-penundo disabled>실행 취소</button>' +
       '<button type="button" class="pen-tool" data-penredo disabled>다시 실행</button>' +
       '<button type="button" class="pen-tool" data-penclear>전체 지우기</button>' +
@@ -279,9 +286,11 @@
         root: view,
         canvas: canvas,
         mode: state.penMode,
+        color: state.penColor,
         getStrokes: function () { return state.strokes[qIdx] || (state.strokes[qIdx] = []); },
         save: savePen,
         onModeChange: function (mode) { state.penMode = mode; },
+        onColorChange: function (color) { state.penColor = color; if (window.Store) window.Store.set(PEN_COLOR_KEY, color); },
         clearMessage: '이 문항의 필기를 모두 지울까요?'
       });
     }

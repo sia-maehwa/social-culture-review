@@ -5,6 +5,8 @@
   var WRONG_KEY = 'socmul_wrong_v1';
   var STATS_KEY = 'socmul_stats_v1';
   var QUIZ_PEN_KEY = 'socmul_quiz_pen_v1';
+  var PEN_COLOR_KEY = 'socmul_pen_color_v1';
+  var DEFAULT_PEN_COLOR = '#d6336c';
 
   var UNIT_COLORS = {
     1: '#2456e6',
@@ -70,7 +72,7 @@
   var CHOICE_LABELS = ['①', '②', '③', '④', '⑤'];
 
   /* ─── 앱 상태 ─── */
-  var state = { view: 'home', unit: 0, ids: [], idx: 0, answered: {}, results: [], mode: 'unit', penMode: 'pen' };
+  var state = { view: 'home', unit: 0, ids: [], idx: 0, answered: {}, results: [], mode: 'unit', penMode: 'pen', penColor: storage.getItem(PEN_COLOR_KEY) || DEFAULT_PEN_COLOR };
 
   var el = {
     views: {
@@ -188,11 +190,15 @@
   }
 
   function quizPenBarHtml() {
+    var colors = [['#d6336c', '빨강'], ['#2563eb', '파랑'], ['#20252b', '검정'], ['#16a34a', '초록'], ['#9333ea', '보라'], ['#ea580c', '주황']];
     return '<div class="pen-bar quiz-pen-bar" aria-label="문제 풀이 필기 도구">' +
       '<span class="pen-bar-label">풀이 필기</span>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'pen' ? ' active' : '') + '" data-penmode="pen" aria-pressed="' + (state.penMode === 'pen') + '">펜</button>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'eraser' ? ' active' : '') + '" data-penmode="eraser" aria-pressed="' + (state.penMode === 'eraser') + '">지우개</button>' +
       '<button type="button" class="pen-tool' + (state.penMode === 'off' ? ' active' : '') + '" data-penmode="off" aria-pressed="' + (state.penMode === 'off') + '">필기 끄기</button>' +
+      '<span class="pen-palette" role="group" aria-label="펜 색상">' + colors.map(function (item) {
+        return '<button type="button" class="pen-color' + (state.penColor === item[0] ? ' active' : '') + '" data-pencolor="' + item[0] + '" aria-label="' + item[1] + '" title="' + item[1] + '" aria-pressed="' + (state.penColor === item[0]) + '"><i style="background:' + item[0] + '"></i></button>';
+      }).join('') + '</span>' +
       '<button type="button" class="pen-tool" data-penundo disabled>실행 취소</button>' +
       '<button type="button" class="pen-tool" data-penredo disabled>다시 실행</button>' +
       '<button type="button" class="pen-tool" data-penclear>전체 지우기</button>' +
@@ -216,6 +222,7 @@
       root: view,
       canvas: canvas,
       mode: state.penMode,
+      color: state.penColor,
       getStrokes: function () { return strokes; },
       save: function () {
         var latest = readJSON(QUIZ_PEN_KEY, {});
@@ -223,6 +230,7 @@
         writeJSON(QUIZ_PEN_KEY, latest);
       },
       onModeChange: function (mode) { state.penMode = mode; },
+      onColorChange: function (color) { state.penColor = color; storage.setItem(PEN_COLOR_KEY, color); },
       clearMessage: '이 문제의 필기를 모두 지울까요?'
     });
   }
