@@ -339,6 +339,9 @@ p, li, figcaption { text-wrap: pretty; }
 .choice:hover:not(:disabled) {
   border-color: var(--color-primary);
   background: var(--color-primary-highlight);
+  color: var(--color-text);
+  transform: translateY(-2px) scale(1.055);
+  box-shadow: 0 8px 20px rgba(36, 86, 230, 0.22);
 }
 .choice:disabled { cursor: default; }
 .choice-num {
@@ -674,7 +677,13 @@ p, li, figcaption { text-wrap: pretty; }
   background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
   cursor: pointer; color: var(--color-text);
 }
-.pq-choice:hover { border-color: var(--color-primary); }
+.pq-choice:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-highlight);
+  color: var(--color-text);
+  transform: translateY(-2px) scale(1.055);
+  box-shadow: 0 8px 20px rgba(36, 86, 230, 0.22);
+}
 .pq-choice.marked { border-color: var(--color-primary); background: var(--color-primary-highlight); }
 .pq-clab { font-weight: 800; flex: 0 0 auto; color: var(--color-primary); }
 .pq-choices.review .pq-choice { cursor: default; }
