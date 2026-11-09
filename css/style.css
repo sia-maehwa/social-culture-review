@@ -111,19 +111,20 @@ p, li, figcaption { text-wrap: pretty; }
   border-bottom: 1px solid var(--color-divider);
 }
 .header-inner {
-  max-width: var(--content-default);
-  margin: 0 auto; padding: var(--space-3) var(--space-5);
+  width: 100%; max-width: 1440px;
+  margin: 0 auto; padding: var(--space-3) clamp(16px, 3vw, 40px);
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
 }
-.logo { display: flex; align-items: center; gap: var(--space-3); text-decoration: none; color: inherit; }
-.logo-text { font-size: var(--text-lg); font-weight: 800; letter-spacing: -0.01em; }
+.logo { display: flex; flex: 0 0 auto; align-items: center; gap: var(--space-3); white-space: nowrap; text-decoration: none; color: inherit; }
+.logo-text { white-space: nowrap; font-size: var(--text-lg); font-weight: 800; letter-spacing: -0.01em; }
 .logo-text em { font-style: normal; color: var(--color-primary); }
 
-.gnb { display: flex; gap: var(--space-1); }
+.gnb { display: flex; flex: 1 1 auto; min-width: 0; justify-content: flex-end; flex-wrap: nowrap; gap: 4px; }
 .gnb-btn {
-  padding: var(--space-2) var(--space-4);
+  flex: 0 0 auto; white-space: nowrap;
+  padding: var(--space-2) clamp(8px, 0.9vw, 14px);
   border-radius: var(--radius-full, 9999px);
-  font-size: var(--text-sm); font-weight: 600; color: var(--color-text-muted);
+  font-size: clamp(0.78rem, 0.9vw, 1rem); font-weight: 600; color: var(--color-text-muted);
   transition: all var(--transition-interactive);
 }
 .gnb-btn:hover { background: var(--color-primary-highlight); color: var(--color-primary); }
@@ -446,6 +447,15 @@ p, li, figcaption { text-wrap: pretty; }
 }
 .site-footer p { font-size: var(--text-xs); color: var(--color-text-faint); margin: 0 auto; max-width: 68ch; }
 
+/* 넓은 태블릿/좁은 데스크톱에서는 로고와 메뉴를 분리해 텍스트가 눌리지 않게 합니다. */
+@media (max-width: 980px) and (min-width: 641px) {
+  .header-inner { flex-direction: column; align-items: stretch; gap: var(--space-2); }
+  .logo { justify-content: center; }
+  .gnb { justify-content: flex-start; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; }
+  .gnb::-webkit-scrollbar { display: none; }
+  .gnb-btn { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+}
+
 /* ─── 반응형 ─── */
 @media (max-width: 640px) {
   .header-inner { flex-direction: column; align-items: stretch; gap: var(--space-2); }
@@ -619,6 +629,9 @@ p, li, figcaption { text-wrap: pretty; }
 .pen-color.active { border-color: var(--color-primary); background: var(--color-primary-highlight); }
 .pen-color:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .view.pen-surface-root { position: relative; touch-action: pan-x pan-y; }
+/* 스타일러스가 hover 중인 입력 위치에만 브라우저 패닝을 막아 획 이동을 받습니다.
+   손가락은 다른 영역에서 기존 페이지 스크롤을 계속 사용할 수 있습니다. */
+.pen-touch-ready { touch-action: none !important; }
 .pen-surface-canvas { position: absolute; top: 0; left: 0; z-index: 20; display: block; pointer-events: none; }
 .pen-hover-target { transform-origin: center center; transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1); }
 .pen-hover-target.pen-hover {
