@@ -69,6 +69,41 @@
       }
       ctx.restore();
     }
+    function drawDot(stroke, point) {
+      var ctx = canvas.getContext('2d');
+      var erasing = stroke.t === 'e';
+      ctx.save();
+      ctx.globalCompositeOperation = erasing ? 'destination-out' : 'source-over';
+      ctx.fillStyle = stroke.c || DEFAULT_COLOR;
+      ctx.beginPath();
+      var p = strokePoint(stroke, point);
+      var width = erasing ? Math.max(26 * ratio, canvas.width / 38) : Math.max(2.8 * ratio, canvas.width / 480);
+      ctx.arc(p[0], p[1], width / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    function drawSegments(stroke, fromPoint, points) {
+      if (!points || !points.length) return;
+      var ctx = canvas.getContext('2d');
+      var erasing = stroke.t === 'e';
+      ctx.save();
+      ctx.globalCompositeOperation = erasing ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = stroke.c || DEFAULT_COLOR;
+      ctx.lineWidth = erasing ? Math.max(26 * ratio, canvas.width / 38) : Math.max(2.8 * ratio, canvas.width / 480);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      var start = strokePoint(stroke, fromPoint);
+      ctx.beginPath();
+      ctx.moveTo(start[0], start[1]);
+      for (var i = 0; i < points.length; i++) {
+        var point = strokePoint(stroke, points[i]);
+        ctx.lineTo(point[0], point[1]);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+    /* 전체 재생은 초기 표시, 크기 변경, 실행 취소/다시 실행/전체 지우기 때만 사용합니다.
+       펜 이동 중에는 이 함수를 호출하지 않습니다. */
     function redraw() {
       var ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -139,11 +174,17 @@
       if (typeof event.getCoalescedEvents === 'function') {
         try { samples = event.getCoalescedEvents() || []; } catch (ignore) { samples = []; }
       }
-      var changed = false;
-      for (var i = 0; i < samples.length; i++) changed = appendPoint(samples[i]) || changed;
-      /* getCoalescedEvents()가 비었거나 마지막 샘플이 현재 좌표보다 앞서 있으면 최종 좌표도 넣습니다. */
-      changed = appendPoint(event) || changed;
-      if (changed) redraw();
+      /* coalesced 샘플과 현재 좌표 중 새로 추가된 점만 모읍니다. */
+      var previous = lastPoint();
+      var added = [];
+      for (var i = 0; i < samples.length; i++) {
+        if (appendPoint(samples[i])) added.push(lastPoint());
+      }
+      /* 마지막 좌표도 포함합니다. pointerrawupdate/pointermove 중복은 좌표 비교로 걸러집니다. */
+      if (appendPoint(event)) added.push(lastPoint());
+      if (!added.length) return;
+      if (previous) drawSegments(activeStroke, previous, added);
+      else drawDot(activeStroke, added[0]);
     }
     function isInsideRoot(target) {
       return !!(target && (target === root || (root.contains && root.contains(target))));
@@ -163,7 +204,7 @@
       };
       root.classList.add('pen-input-active');
       try { root.setPointerCapture(event.pointerId); } catch (ignore) {}
-      redraw();
+      drawDot(activeStroke, activeStroke.p[0]);
       /* pointerdown은 취소하지 않습니다. 일부 Android Chrome이 생성하는 보조 mousemove
          이벤트도 아래 fallback 입력 경로에서 사용할 수 있게 둡니다. */
     }
@@ -185,8 +226,8 @@
       root.classList.remove('pen-input-active');
       getStrokes().push(completed);
       redoStack = [];
+      /* 캔버스에는 획이 이미 증분 렌더링되어 있으므로 전체 redraw 없이 저장만 합니다. */
       save();
-      redraw();
     }
     function cancel(event) {
       if (!activeStroke || (event && event.pointerId !== activePointerId)) return;
@@ -200,7 +241,7 @@
         redoStack = [];
         save();
       }
-      redraw();
+      /* 부분 획도 입력 중 캔버스에 이미 그려졌으므로 전체 재생은 필요하지 않습니다. */
     }
 
     var capture = { capture: true, passive: false };

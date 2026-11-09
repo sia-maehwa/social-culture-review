@@ -131,7 +131,10 @@
     }
 
     document.addEventListener('pointerover', function (event) {
-      if (event.pointerType === 'pen' && event.buttons === 0) updateHover(hitTest(event), 'pen');
+      /* 버튼을 누르기 전 대상에 진입하는 순간부터 pen/mouse hover를 적용합니다. */
+      if ((event.pointerType === 'pen' || event.pointerType === 'mouse') && event.buttons === 0) {
+        updateHover(hitTest(event), event.pointerType);
+      }
     }, true);
     document.addEventListener('pointermove', function (event) { handleMove(event); }, true);
 
