@@ -81,30 +81,71 @@
 
   var CHOICE_LABELS = ['①', '②', '③', '④', '⑤'];
 
-  /* 펜이 화면에 닿지 않은 상태의 pointermove를 받아 공통 호버 UI를 제공합니다. */
+  /* 스타일러스 호버 확대와 펜 입력 준비를 공통 처리합니다. */
   (function bindStylusHover() {
-    var activeTarget = null;
+    var activeTarget = null, touchTarget = null, activePenPointerId = null;
     var selector = 'button:not(:disabled), a[href], [role="button"], .unit-card, .exam-card, .choice, .pq-choice, .omr-cell, .ctab, .cmd-btn, .grow-btn';
-    function clear() {
+
+    function clearHover() {
       if (activeTarget) activeTarget.classList.remove('pen-hover');
       activeTarget = null;
     }
-    function update(target) {
+    function setTouchTarget(target) {
+      var root = target && target.closest ? target.closest('.pen-surface-root') : null;
+      var next = root ? target : null;
+      if (next === touchTarget) return;
+      if (touchTarget) touchTarget.classList.remove('pen-touch-ready');
+      touchTarget = next;
+      if (touchTarget) touchTarget.classList.add('pen-touch-ready');
+    }
+    function update(target, pointerType) {
       var next = target && target.closest ? target.closest(selector) : null;
-      if (next === activeTarget) return;
-      clear();
-      activeTarget = next;
-      if (activeTarget) activeTarget.classList.add('pen-hover-target', 'pen-hover');
+      if (next !== activeTarget) {
+        clearHover();
+        activeTarget = next;
+        if (activeTarget) activeTarget.classList.add('pen-hover-target', 'pen-hover');
+      }
+      if (pointerType === 'pen') setTouchTarget(target);
+      else if (activePenPointerId === null) setTouchTarget(null);
+    }
+    function hitTest(event) {
+      if (typeof document.elementFromPoint === 'function') {
+        return document.elementFromPoint(event.clientX, event.clientY) || event.target;
+      }
+      return event.target;
     }
     document.addEventListener('pointermove', function (event) {
-      if (event.pointerType === 'pen' && event.buttons === 0) update(event.target);
-      else clear();
+      /* 일부 태블릿 브라우저는 스타일러스를 mouse로 보고하기도 합니다.
+         touch 입력은 hover 이동을 발생시키지 않으므로 pen/mouse만 처리합니다. */
+      if ((event.pointerType === 'pen' || event.pointerType === 'mouse') && event.buttons === 0) {
+        update(hitTest(event), event.pointerType);
+      } else {
+        clearHover();
+      }
     }, true);
-    document.addEventListener('pointerdown', clear, true);
+    document.addEventListener('pointerdown', function (event) {
+      clearHover();
+      if (event.pointerType === 'pen') activePenPointerId = event.pointerId;
+    }, true);
+    function endPenPointer(event) {
+      if (activePenPointerId !== null && event.pointerId === activePenPointerId) {
+        activePenPointerId = null;
+        setTouchTarget(null);
+      }
+    }
+    document.addEventListener('pointerup', endPenPointer, true);
+    document.addEventListener('pointercancel', endPenPointer, true);
     document.addEventListener('pointerout', function (event) {
-      if (event.pointerType === 'pen' && !event.relatedTarget) clear();
+      if (event.pointerType === 'pen' && !event.relatedTarget) {
+        clearHover();
+        if (activePenPointerId === null) setTouchTarget(null);
+      }
     }, true);
-    window.addEventListener('blur', clear);
+    window.addEventListener('blur', function () {
+      activePenPointerId = null;
+      clearHover();
+      setTouchTarget(null);
+    });
   })();
 
   function getSelectedSubject() {
