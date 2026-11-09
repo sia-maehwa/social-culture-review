@@ -273,19 +273,25 @@ p, li, figcaption { text-wrap: pretty; }
 .q-diff-label { font-size: var(--text-xs); color: var(--color-text-faint); font-weight: 600; margin-left: 2px; }
 
 .q-text { font-size: var(--text-base); font-weight: 600; line-height: 1.7; }
-.quiz-question-annotate { position: relative; margin-bottom: var(--space-4); }
-.quiz-question-annotate .q-text { position: relative; z-index: 0; }
-.quiz-pen-canvas {
-  position: absolute; inset: 0; z-index: 1; display: block;
-  width: 100%; height: 100%; touch-action: pan-y; cursor: crosshair;
-}
-.pen-input-hint { font-size: var(--text-xs); color: var(--color-text-faint); }
+.quiz-question-annotate { position: relative; min-height: clamp(500px, 64vh, 760px); margin-bottom: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-2); overflow: hidden; }
+.quiz-question-annotate.is-expanded { min-height: min(88vh, 1000px); }
+.quiz-question-annotate .q-text { position: relative; z-index: 0; padding: var(--space-4); }
+.quiz-pen-canvas { position: absolute; inset: 0; z-index: 1; display: block; width: 100%; height: 100%; touch-action: pan-y; cursor: crosshair; }
+.pen-input-hint { font-size: var(--text-xs); color: var(--color-text-faint); flex-basis: 100%; }
 .pen-tool:disabled { opacity: .4; cursor: not-allowed; }
-@media (max-width: 640px) {
-  .pen-bar { gap: 6px; }
-  .pen-tool { padding: 6px 10px; }
-  .pen-input-hint { flex-basis: 100%; }
-}
+.pen-palette { display: inline-flex; align-items: center; gap: 5px; padding: 2px 5px; border: 1px solid var(--color-border); border-radius: 999px; }
+.pen-color { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 3px; border: 1px solid transparent; border-radius: 50%; background: transparent; cursor: pointer; }
+.pen-color i { width: 16px; height: 16px; border-radius: 50%; display: block; border: 1px solid #0002; }
+.pen-color.active { border-color: var(--color-primary); background: var(--color-primary-highlight); }
+.pen-color:focus-visible, .pen-tool:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.pen-gesture-locked { touch-action: none !important; overscroll-behavior: contain; }
+.view:fullscreen { display: block; overflow-y: auto; min-height: 100vh; width: 100%; max-width: none; padding: max(14px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom)); background: var(--color-bg); }
+.view.pen-focus-mode { position: fixed; inset: 0; z-index: 9999; overflow-y: auto; max-width: none; margin: 0; padding: max(14px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom)); background: var(--color-bg); }
+.subject-switcher { display: inline-flex; align-items: center; gap: 8px; margin-left: 16px; font-size: var(--text-xs); color: var(--color-text-muted); }
+.subject-switcher select { max-width: 160px; padding: 7px 10px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-text); }
+.exam-rights-notice { margin-top: var(--space-6); padding: var(--space-4) var(--space-5); border: 1px solid var(--color-border); border-left: 4px solid var(--color-warning); border-radius: var(--radius-md); background: var(--color-surface-2); }
+.exam-rights-notice p { margin: 6px 0 0; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.6; }
+@media (max-width: 640px) { .pen-bar { gap: 6px; } .pen-tool { padding: 6px 10px; } .pen-input-hint { flex-basis: 100%; } .subject-switcher { margin: 8px 0 0; } }
 .q-text u { text-decoration-color: var(--color-error); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .q-text mark { background: var(--hl); padding: 0 2px; border-radius: 2px; }
 
@@ -590,15 +596,17 @@ p, li, figcaption { text-wrap: pretty; }
 }
 .pen-tool:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .pen-tool.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
-.exam-qwrap { position: relative; }
+.exam-qwrap { position: relative; min-height: 500px; }
 .qimg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: pan-y; cursor: crosshair; }
 .exam-memo { margin-top: var(--space-4); }
 .memo-label { font-size: var(--text-xs); color: var(--color-text-faint); margin-bottom: var(--space-2); }
 .memo-canvas {
-  width: 100%; aspect-ratio: 1200 / 640; touch-action: pan-y; cursor: crosshair; display: block;
+  width: 100%; height: clamp(500px, 64vh, 760px); aspect-ratio: auto;
+  touch-action: pan-y; cursor: crosshair; display: block;
   background: repeating-linear-gradient(0deg, #fff, #fff 39px, #eef1f4 40px);
   border: 1px dashed var(--color-border); border-radius: var(--radius-sm);
 }
+.exam-memo.is-expanded .memo-canvas { height: min(88vh, 1000px); }
 
 /* 텍스트 문항 (예상 모의고사) */
 .predict-card2 { padding: var(--space-5); }
