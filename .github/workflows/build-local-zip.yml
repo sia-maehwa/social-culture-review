@@ -1,0 +1,38 @@
+name: Build local ZIP entrypoint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app-source.html'
+      - 'css/**'
+      - 'js/**'
+      - 'assets/exams/**'
+      - 'tools/build-offline.js'
+      - '.github/workflows/build-local-zip.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: find js tools -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Build standalone local index.html
+        run: node tools/build-offline.js
+      - name: Commit updated local entrypoint
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "Local entrypoint is already current."
+            exit 0
+          fi
+          git commit -m "Build standalone local study app"
+          git push origin HEAD:main

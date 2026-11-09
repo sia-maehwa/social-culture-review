@@ -90,6 +90,7 @@
   };
 
   function show(view) {
+    if (view !== 'quiz' && el.views.quiz && el.views.quiz._penToolsCleanup) el.views.quiz._penToolsCleanup();
     if (window.ExamUI) window.ExamUI.cleanup();
     if (window.GameUI) window.GameUI.cleanup();
     state.view = view;
@@ -202,25 +203,17 @@
       '<button type="button" class="pen-tool" data-penundo disabled>실행 취소</button>' +
       '<button type="button" class="pen-tool" data-penredo disabled>다시 실행</button>' +
       '<button type="button" class="pen-tool" data-penclear>전체 지우기</button>' +
-      '<span class="pen-input-hint">스타일러스 전용 · 손가락은 스크롤</span>' +
+      '<span class="pen-input-hint">펜: 필기 · 손가락: 화면 드래그</span>' +
       '</div>';
   }
 
   function bindQuizPen(view, question) {
-    var canvas = view.querySelector('.quiz-pen-canvas');
-    if (!canvas || !window.PenTools) return;
-
+    if (!window.PenTools) return;
     var all = readJSON(QUIZ_PEN_KEY, {});
     var questionKey = String(question.id);
     var strokes = Array.isArray(all[questionKey]) ? all[questionKey] : [];
-    var rect = canvas.getBoundingClientRect();
-    var ratio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
-    canvas.width = Math.max(900, Math.round(rect.width * ratio));
-    canvas.height = Math.max(260, Math.round(rect.height * ratio));
-
-    window.PenTools.bind({
+    var tools = window.PenTools.bind({
       root: view,
-      canvas: canvas,
       mode: state.penMode,
       color: state.penColor,
       getStrokes: function () { return strokes; },
@@ -233,6 +226,7 @@
       onColorChange: function (color) { state.penColor = color; storage.setItem(PEN_COLOR_KEY, color); },
       clearMessage: '이 문제의 필기를 모두 지울까요?'
     });
+    if (tools) view._penToolsCleanup = tools.destroy;
   }
 
   function renderQuiz() {
@@ -256,8 +250,7 @@
       '<span class="q-num">' + (state.mode === 'wrong' ? '재도전 ' : '') + 'Q' + q.id + '</span>' +
       '<span class="q-diff" title="난이도">' + diffDots(q.d) + '<span class="q-diff-label">' + diffLabel(q.d) + '</span></span></div>';
 
-    html += '<div class="quiz-question-annotate"><div class="q-text">' + q.q + '</div>' +
-      '<canvas class="quiz-pen-canvas" width="1200" height="500" aria-label="문제 위에 스타일러스 필기"></canvas></div>';
+    html += '<div class="q-text quiz-question-prompt">' + q.q + '</div>';
 
     html += '<div class="choices" role="group" aria-label="선택지">';
     q.c.forEach(function (c, i) {

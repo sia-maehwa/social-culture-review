@@ -275,25 +275,24 @@
       '<button type="button" class="pen-tool" data-penundo disabled>실행 취소</button>' +
       '<button type="button" class="pen-tool" data-penredo disabled>다시 실행</button>' +
       '<button type="button" class="pen-tool" data-penclear>전체 지우기</button>' +
-      '<span class="pen-input-hint">스타일러스 전용 · 손가락은 스크롤</span>' +
+      '<span class="pen-input-hint">펜: 필기 · 손가락: 화면 드래그</span>' +
       '</div>';
   }
 
-  function bindPen(view, canvas, qIdx) {
-    if (!canvas) return;
-    if (window.PenTools) {
-      return window.PenTools.bind({
-        root: view,
-        canvas: canvas,
-        mode: state.penMode,
-        color: state.penColor,
-        getStrokes: function () { return state.strokes[qIdx] || (state.strokes[qIdx] = []); },
-        save: savePen,
-        onModeChange: function (mode) { state.penMode = mode; },
-        onColorChange: function (color) { state.penColor = color; if (window.Store) window.Store.set(PEN_COLOR_KEY, color); },
-        clearMessage: '이 문항의 필기를 모두 지울까요?'
-      });
-    }
+  function bindPen(view, qIdx) {
+    if (!window.PenTools) return null;
+    var tools = window.PenTools.bind({
+      root: view,
+      mode: state.penMode,
+      color: state.penColor,
+      getStrokes: function () { return state.strokes[qIdx] || (state.strokes[qIdx] = []); },
+      save: savePen,
+      onModeChange: function (mode) { state.penMode = mode; },
+      onColorChange: function (color) { state.penColor = color; if (window.Store) window.Store.set(PEN_COLOR_KEY, color); },
+      clearMessage: '이 문항의 필기를 모두 지울까요?'
+    });
+    if (tools) view._penToolsCleanup = tools.destroy;
+    return tools;
   }
 
   function renderRun(view) {
@@ -329,15 +328,13 @@
           return '<button type="button" class="pq-choice' + (marked ? ' marked' : '') + '" data-omr="' + i + '" aria-pressed="' + marked + '">' +
             '<span class="pq-clab">' + CHOICE_LABELS[i] + '</span><span class="pq-ctext">' + c + '</span></button>';
         }).join('') + '</div>' +
-        '<div class="exam-memo"><div class="memo-label">풀이 메모 (스타일러스 전용 · 손가락은 스크롤)</div>' +
-        '<canvas class="pen-canvas memo-canvas" width="1200" height="640"></canvas></div>' +
         '</div>';
     } else {
       /* 이미지 문항 (기출) */
       html += '<div class="exam-qcard">' +
         '<div class="exam-qwrap">' +
         '<img class="exam-qimg" id="examQImg" src="' + imgSrc(e.id, n) + '" alt="' + esc2(e.label) + ' ' + n + '번 문항" loading="eager" />' +
-        '<canvas class="pen-canvas qimg-canvas"></canvas></div>' +
+        '</div>' +
         '<div class="omr" role="group" aria-label="답안 선택">' +
         CHOICE_LABELS.map(function (c, i) {
           var marked = state.answers[state.idx] === i;
@@ -401,22 +398,8 @@
       if (window.AppUI) window.AppUI.show('exam');
     });
 
-    /* 펜 캔버스 */
-    if (predict) {
-      bindPen(view, view.querySelector('.memo-canvas'), state.idx);
-    } else {
-      var img = view.querySelector('#examQImg');
-      var canvas = view.querySelector('.qimg-canvas');
-      if (img && canvas) {
-        var setup = function () {
-          canvas.width = img.naturalWidth || 900;
-          canvas.height = img.naturalHeight || 1200;
-          bindPen(view, canvas, state.idx);
-        };
-        if (img.complete && img.naturalWidth) setup();
-        else img.addEventListener('load', setup);
-      }
-    }
+    /* 현재 문항 화면 전체를 필기 면으로 사용합니다. */
+    bindPen(view, state.idx);
   }
 
   function submitExam(auto) {
@@ -559,6 +542,10 @@
     renderPicker: renderPicker,
     renderRun: renderRun,
     renderResult: renderResult,
-    cleanup: stopTimer,
+    cleanup: function () {
+      stopTimer();
+      var runView = document.getElementById('view-examrun');
+      if (runView && runView._penToolsCleanup) runView._penToolsCleanup();
+    },
   };
 })();

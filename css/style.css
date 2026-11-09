@@ -273,12 +273,6 @@ p, li, figcaption { text-wrap: pretty; }
 .q-diff-label { font-size: var(--text-xs); color: var(--color-text-faint); font-weight: 600; margin-left: 2px; }
 
 .q-text { font-size: var(--text-base); font-weight: 600; line-height: 1.7; }
-.quiz-question-annotate { position: relative; margin-bottom: var(--space-4); }
-.quiz-question-annotate .q-text { position: relative; z-index: 0; }
-.quiz-pen-canvas {
-  position: absolute; inset: 0; z-index: 1; display: block;
-  width: 100%; height: 100%; touch-action: pan-y; cursor: crosshair;
-}
 .pen-input-hint { font-size: var(--text-xs); color: var(--color-text-faint); }
 .pen-tool:disabled { opacity: .4; cursor: not-allowed; }
 @media (max-width: 640px) {
@@ -595,15 +589,11 @@ p, li, figcaption { text-wrap: pretty; }
 .pen-color i { display: block; width: 16px; height: 16px; border: 1px solid #0002; border-radius: 50%; }
 .pen-color.active { border-color: var(--color-primary); background: var(--color-primary-highlight); }
 .pen-color:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.view.pen-surface-root { position: relative; touch-action: pan-x pan-y; }
+.pen-surface-canvas { position: absolute; top: 0; left: 0; z-index: 20; display: block; pointer-events: none; }
+.quiz-question-prompt { margin-bottom: var(--space-4); }
+.pen-input-hint { flex-basis: 100%; }
 .exam-qwrap { position: relative; }
-.qimg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: pan-y; cursor: crosshair; }
-.exam-memo { margin-top: var(--space-4); }
-.memo-label { font-size: var(--text-xs); color: var(--color-text-faint); margin-bottom: var(--space-2); }
-.memo-canvas {
-  width: 100%; aspect-ratio: 1200 / 640; touch-action: pan-y; cursor: crosshair; display: block;
-  background: repeating-linear-gradient(0deg, #fff, #fff 39px, #eef1f4 40px);
-  border: 1px dashed var(--color-border); border-radius: var(--radius-sm);
-}
 
 /* 텍스트 문항 (예상 모의고사) */
 .predict-card2 { padding: var(--space-5); }
