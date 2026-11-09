@@ -349,6 +349,9 @@ p, li, figcaption { text-wrap: pretty; }
 .choice:hover:not(:disabled) {
   border-color: var(--color-primary);
   background: var(--color-primary-highlight);
+  color: var(--color-text);
+  transform: translateY(-2px) scale(1.055);
+  box-shadow: 0 8px 20px rgba(36, 86, 230, 0.22);
 }
 .choice:disabled { cursor: default; }
 .choice-num {
@@ -684,7 +687,13 @@ p, li, figcaption { text-wrap: pretty; }
   background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
   cursor: pointer; color: var(--color-text);
 }
-.pq-choice:hover { border-color: var(--color-primary); }
+.pq-choice:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-highlight);
+  color: var(--color-text);
+  transform: translateY(-2px) scale(1.055);
+  box-shadow: 0 8px 20px rgba(36, 86, 230, 0.22);
+}
 .pq-choice.marked { border-color: var(--color-primary); background: var(--color-primary-highlight); }
 .pq-clab { font-weight: 800; flex: 0 0 auto; color: var(--color-primary); }
 .pq-choices.review .pq-choice { cursor: default; }
@@ -5248,6 +5257,8 @@ var PREDICT_EXAMS = [
     var capture = { capture: true, passive: false };
     document.addEventListener('pointerdown', onPointerDown, capture);
     document.addEventListener('pointermove', onPointerMove, capture);
+    /* 고주사율 펜의 프레임 사이 이동도 가능한 브라우저에서는 별도로 수집합니다. */
+    document.addEventListener('pointerrawupdate', onPointerMove, capture);
     document.addEventListener('mousemove', onMouseMoveFallback, true);
     document.addEventListener('pointerup', finish, true);
     document.addEventListener('pointercancel', cancel, true);
@@ -5299,6 +5310,7 @@ var PREDICT_EXAMS = [
       if (resizeObserver) resizeObserver.disconnect();
       document.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('pointermove', onPointerMove, true);
+      document.removeEventListener('pointerrawupdate', onPointerMove, true);
       document.removeEventListener('mousemove', onMouseMoveFallback, true);
       document.removeEventListener('pointerup', finish, true);
       document.removeEventListener('pointercancel', cancel, true);
