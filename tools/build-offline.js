@@ -9,14 +9,44 @@ const write = (file, value) => fs.writeFileSync(path.join(root, file), value, 'u
 function assert(ok, message) { if (!ok) throw new Error(message); }
 function safeScript(source) { return source.replace(/<\/script/gi, '<\\/script'); }
 function safeStyle(source) { return source.replace(/<\/style/gi, '<\\/style'); }
-function getExamSessions() {
+function validateQuestionData() {
   const context = {}; vm.createContext(context);
+  vm.runInContext(read('js/data.js'), context, { filename: 'js/data.js' });
   vm.runInContext(read('js/exams.js'), context, { filename: 'js/exams.js' });
-  const exams = Array.from(context.EXAMS || []);
-  assert(exams.length === 15, 'Expected 15 exam sessions; found ' + exams.length + '.');
-  const questions = exams.reduce((sum, exam) => sum + (exam.questions || []).length, 0);
-  assert(questions === 300, 'Expected 300 exam questions; found ' + questions + '.');
-  return exams;
+  vm.runInContext(read('js/predict.js'), context, { filename: 'js/predict.js' });
+  const base = vm.runInContext('({ units: UNITS, questions: QUESTIONS, concepts: CONCEPTS })', context);
+  assert(base.units.length === 5, 'Expected 5 units; found ' + base.units.length + '.');
+  assert(base.questions.length === 62, 'Expected 62 concept questions; found ' + base.questions.length + '.');
+  assert(Object.keys(base.concepts).length === 5, 'Expected concepts for 5 units.');
+  const unitIds = new Set(base.units.map(unit => unit.id));
+  for (const q of base.questions) {
+    assert(unitIds.has(q.u), 'Concept question ' + q.id + ' refers to missing unit ' + q.u + '.');
+    assert(typeof q.q === 'string' && q.q.length > 0, 'Question ' + q.id + ' has no prompt.');
+    assert(Array.isArray(q.c) && q.c.length === 5, 'Question ' + q.id + ' does not have five choices.');
+    assert(Number.isInteger(q.a) && q.a >= 0 && q.a <= 4, 'Question ' + q.id + ' has an invalid answer index.');
+    assert(typeof q.e === 'string' && q.e.length > 0, 'Question ' + q.id + ' has no explanation.');
+  }
+  const exams = Array.from(vm.runInContext('EXAMS', context));
+  assert(exams.length === 15, 'Expected 15 official exam sessions; found ' + exams.length + '.');
+  assert(exams.reduce((sum, exam) => sum + exam.questions.length, 0) === 300, 'Expected 300 official exam answer records.');
+  for (const exam of exams) {
+    assert(exam.questions.length === 20, 'Exam ' + exam.id + ' does not contain 20 questions.');
+    for (let i = 0; i < exam.questions.length; i += 1) {
+      const q = exam.questions[i];
+      assert(q.n === i + 1, 'Exam ' + exam.id + ' has an out-of-order question number.');
+      assert(Number.isInteger(q.ans) && q.ans >= 0 && q.ans <= 4, 'Exam ' + exam.id + ' question ' + q.n + ' has an invalid answer.');
+      assert(q.pts === 2 || q.pts === 3, 'Exam ' + exam.id + ' question ' + q.n + ' has an invalid point value.');
+    }
+  }
+  const predict = Array.from(vm.runInContext('PREDICT_EXAMS', context));
+  assert(predict.length === 3, 'Expected 3 self-made mock exams; found ' + predict.length + '.');
+  assert(predict.reduce((sum, exam) => sum + exam.questions.length, 0) === 60, 'Expected 60 self-made mock questions.');
+  for (const exam of predict) for (const q of exam.questions) {
+    assert(Array.isArray(q.c) && q.c.length === 5, 'Predict exam ' + exam.id + ' question ' + q.n + ' does not have five choices.');
+    assert(Number.isInteger(q.a) && q.a >= 0 && q.a <= 4, 'Predict exam ' + exam.id + ' question ' + q.n + ' has an invalid answer.');
+    assert(typeof q.e === 'string' && q.e.length > 0, 'Predict exam ' + exam.id + ' question ' + q.n + ' has no explanation.');
+  }
+  return { exams, conceptQuestions: base.questions.length, predictQuestions: predict.reduce((sum, exam) => sum + exam.questions.length, 0) };
 }
 function makeImageManifest(exams) {
   const manifest = Object.create(null); let count = 0;
@@ -27,6 +57,7 @@ function makeImageManifest(exams) {
     assert(fs.existsSync(absolute), 'Missing exam image: ' + relative);
     const bytes = fs.readFileSync(absolute);
     assert(bytes.length > 1000, 'Exam image is empty or truncated: ' + relative);
+    assert(bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[bytes.length - 2] === 0xff && bytes[bytes.length - 1] === 0xd9, 'Exam image is not a complete JPEG: ' + relative);
     manifest[exam.id + '/' + filename] = 'data:image/jpeg;base64,' + bytes.toString('base64');
     count += 1;
   }
@@ -67,9 +98,13 @@ function inlineExamImageLookup(html, manifest) {
   return html;
 }
 function main() {
+  const nomedia = path.join(root, 'assets', '.nomedia');
+  assert(fs.existsSync(nomedia) && fs.statSync(nomedia).size === 0, 'Missing empty assets/.nomedia; Android Gallery may index the exam JPG files.');
   let html = read('app-source.html');
   assert(!html.includes('data-pplx-inline-edit'), 'Unexpected editor-injected script in app-source.html.');
-  const exams = getExamSessions();
+  assert(html.includes('id="view-subject-select"'), 'The first-visit subject selection view is missing.');
+  const dataCheck = validateQuestionData();
+  const exams = dataCheck.exams;
   const imagePack = makeImageManifest(exams);
   html = inlineStyles(html);
   html = inlineScripts(html);
@@ -77,8 +112,10 @@ function main() {
   html = html.replace('<title>사회문화 연습장 — 수능 개념 문제 연습</title>', '<title>사회문화 연습장</title>');
   html = html.replace('<meta name="description"', '<meta name="local-bundle" content="self-contained-css-js-and-300-exam-images" />\n<meta name="description"');
   assert(!/<(?:script|link)\b[^>]*\b(?:src|href)=["'](?:css|js|assets)\//i.test(html), 'A local external runtime reference remains.');
+  assert(!/<link\b[^>]*\bhref=["']https?:\/\//i.test(html), 'The local HTML still depends on an external stylesheet.');
   write('index.html', html);
   console.log('Built index.html: ' + (Buffer.byteLength(html, 'utf8') / 1024 / 1024).toFixed(2) + ' MiB');
+  console.log('Validated 5 units, ' + dataCheck.conceptQuestions + ' concept questions, ' + exams.length + ' official sessions / 300 answer records, and ' + dataCheck.predictQuestions + ' self-made questions.');
   console.log('Embedded ' + imagePack.count + ' exam images from ' + exams.length + ' sessions.');
 }
 main();

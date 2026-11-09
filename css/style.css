@@ -55,6 +55,7 @@
 
 /* ─── 기본 스타일 ─── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 
 html {
   -webkit-text-size-adjust: none; text-size-adjust: none;
@@ -145,6 +146,34 @@ p, li, figcaption { text-wrap: pretty; }
 }
 .view { animation: viewIn 240ms cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes viewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ─── 첫 진입 과목 선택 ─── */
+.subject-pick-page { max-width: 720px; margin: 0 auto; padding: clamp(12px, 4vh, 36px) 0; }
+.subject-pick-page > .hero-kicker { margin-bottom: var(--space-4); }
+.subject-pick-page h1 { font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 850; letter-spacing: -0.035em; margin-bottom: var(--space-3); }
+.subject-pick-description { color: var(--color-text-muted); margin-bottom: var(--space-8); }
+.subject-pick-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-3); }
+.subject-pick-button {
+  display: flex; align-items: center; gap: var(--space-4); width: 100%; min-height: 104px;
+  padding: var(--space-5); text-align: left; color: var(--color-text);
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+  border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); cursor: pointer;
+  transition: transform var(--transition-interactive), box-shadow var(--transition-interactive), border-color var(--transition-interactive), background var(--transition-interactive);
+}
+.subject-pick-button:hover, .subject-pick-button:focus-visible {
+  border-color: var(--color-primary); background: var(--color-primary-highlight); box-shadow: var(--shadow-md);
+}
+.subject-pick-mark {
+  display: inline-flex; flex: 0 0 52px; width: 52px; height: 52px; align-items: center; justify-content: center;
+  color: #fff; background: var(--color-primary); border-radius: 16px; font-size: 1.35rem; font-weight: 850;
+}
+.subject-pick-copy { display: grid; gap: 3px; min-width: 0; }
+.subject-pick-copy strong { font-size: var(--text-lg); font-weight: 800; }
+.subject-pick-copy small { color: var(--color-primary); font-size: var(--text-xs); font-weight: 700; }
+.subject-pick-copy > span { color: var(--color-text-muted); font-size: var(--text-sm); }
+.subject-pick-action { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; white-space: nowrap; color: var(--color-primary); font-size: var(--text-sm); font-weight: 800; }
+.subject-pick-action > span { font-size: 1.2em; }
+.subject-pick-footnote { margin-top: var(--space-5); color: var(--color-text-faint); font-size: var(--text-xs); }
 
 /* ─── 홈 화면 ─── */
 .hero { margin-bottom: var(--space-10); }
@@ -591,6 +620,12 @@ p, li, figcaption { text-wrap: pretty; }
 .pen-color:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .view.pen-surface-root { position: relative; touch-action: pan-x pan-y; }
 .pen-surface-canvas { position: absolute; top: 0; left: 0; z-index: 20; display: block; pointer-events: none; }
+.pen-hover-target { transform-origin: center center; transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1); }
+.pen-hover-target.pen-hover {
+  position: relative; z-index: 60;
+  transform: translateY(-2px) scale(1.055);
+  box-shadow: 0 10px 24px rgba(31, 39, 51, 0.18);
+}
 .quiz-question-prompt { margin-bottom: var(--space-4); }
 .pen-input-hint { flex-basis: 100%; }
 .exam-qwrap { position: relative; }
@@ -848,3 +883,11 @@ p, li, figcaption { text-wrap: pretty; }
   .game-head { flex-direction: column; }
   .game-floor-badge { align-self: flex-start; }
 }
+
+@media (max-width: 640px) {
+  .subject-pick-button { min-height: 88px; padding: var(--space-4); gap: var(--space-3); }
+  .subject-pick-mark { flex-basis: 44px; width: 44px; height: 44px; border-radius: 13px; }
+  .subject-pick-action { font-size: var(--text-xs); }
+  .pen-hover-target.pen-hover { transform: translateY(-1px) scale(1.035); }
+}
+@media (prefers-reduced-motion: reduce) { .pen-hover-target { transition: none; } }

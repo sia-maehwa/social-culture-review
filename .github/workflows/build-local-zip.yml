@@ -7,7 +7,7 @@ on:
       - 'app-source.html'
       - 'css/**'
       - 'js/**'
-      - 'assets/exams/**'
+      - 'assets/**'
       - 'tools/build-offline.js'
       - '.github/workflows/build-local-zip.yml'
 permissions:

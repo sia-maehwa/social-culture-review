@@ -7,6 +7,16 @@
   var QUIZ_PEN_KEY = 'socmul_quiz_pen_v1';
   var PEN_COLOR_KEY = 'socmul_pen_color_v1';
   var DEFAULT_PEN_COLOR = '#d6336c';
+  var SELECTED_SUBJECT_KEY = 'study_selected_subject_v1';
+  var LEGACY_SUBJECT_KEY = 'study_active_subject_v1';
+  /* 현재 실제 문제 데이터가 준비된 과목만 선택지로 표시합니다. */
+  var SUBJECTS = [{
+    id: 'social-culture',
+    title: '사회·문화',
+    curriculum: '2015 개정 교육과정',
+    description: '사회·문화 핵심 개념과 평가원 기출을 학습합니다.',
+    detail: '5개 단원 · 개념 문제 62문항 · 기출 15회분'
+  }];
 
   var UNIT_COLORS = {
     1: '#2456e6',
@@ -71,11 +81,46 @@
 
   var CHOICE_LABELS = ['①', '②', '③', '④', '⑤'];
 
+  /* 펜이 화면에 닿지 않은 상태의 pointermove를 받아 공통 호버 UI를 제공합니다. */
+  (function bindStylusHover() {
+    var activeTarget = null;
+    var selector = 'button:not(:disabled), a[href], [role="button"], .unit-card, .exam-card, .choice, .pq-choice, .omr-cell, .ctab, .cmd-btn, .grow-btn';
+    function clear() {
+      if (activeTarget) activeTarget.classList.remove('pen-hover');
+      activeTarget = null;
+    }
+    function update(target) {
+      var next = target && target.closest ? target.closest(selector) : null;
+      if (next === activeTarget) return;
+      clear();
+      activeTarget = next;
+      if (activeTarget) activeTarget.classList.add('pen-hover-target', 'pen-hover');
+    }
+    document.addEventListener('pointermove', function (event) {
+      if (event.pointerType === 'pen' && event.buttons === 0) update(event.target);
+      else clear();
+    }, true);
+    document.addEventListener('pointerdown', clear, true);
+    document.addEventListener('pointerout', function (event) {
+      if (event.pointerType === 'pen' && !event.relatedTarget) clear();
+    }, true);
+    window.addEventListener('blur', clear);
+  })();
+
+  function getSelectedSubject() {
+    var saved = storage.getItem(SELECTED_SUBJECT_KEY) || storage.getItem(LEGACY_SUBJECT_KEY);
+    if (!SUBJECTS.some(function (subject) { return subject.id === saved; })) return null;
+    if (storage.getItem(SELECTED_SUBJECT_KEY) !== saved) storage.setItem(SELECTED_SUBJECT_KEY, saved);
+    return saved;
+  }
+
   /* ─── 앱 상태 ─── */
-  var state = { view: 'home', unit: 0, ids: [], idx: 0, answered: {}, results: [], mode: 'unit', penMode: 'pen', penColor: storage.getItem(PEN_COLOR_KEY) || DEFAULT_PEN_COLOR };
+  var initialView = getSelectedSubject() ? 'home' : 'subject-select';
+  var state = { view: initialView, unit: 0, ids: [], idx: 0, answered: {}, results: [], mode: 'unit', penMode: 'pen', penColor: storage.getItem(PEN_COLOR_KEY) || DEFAULT_PEN_COLOR };
 
   var el = {
     views: {
+      subjectSelect: document.getElementById('view-subject-select'),
       home: document.getElementById('view-home'),
       quiz: document.getElementById('view-quiz'),
       result: document.getElementById('view-result'),
@@ -90,18 +135,52 @@
   };
 
   function show(view) {
+    if (view !== 'subject-select' && !getSelectedSubject()) view = 'subject-select';
     if (view !== 'quiz' && el.views.quiz && el.views.quiz._penToolsCleanup) el.views.quiz._penToolsCleanup();
     if (window.ExamUI) window.ExamUI.cleanup();
     if (window.GameUI) window.GameUI.cleanup();
     state.view = view;
     Object.keys(el.views).forEach(function (k) {
-      el.views[k].hidden = (k !== view);
+      el.views[k].hidden = (k !== view && k !== 'subjectSelect');
     });
+    if (el.views.subjectSelect) el.views.subjectSelect.hidden = (view !== 'subject-select');
+    var navigation = document.querySelector('.gnb');
+    if (navigation) navigation.hidden = (view === 'subject-select');
     document.querySelectorAll('.gnb-btn').forEach(function (b) {
       b.classList.toggle('active', b.dataset.nav === view);
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
     render();
+  }
+
+  /* ─── 첫 진입 과목 선택 ─── */
+  function renderSubjectSelect() {
+    var selected = getSelectedSubject();
+    var html = '<div class="subject-pick-page">' +
+      '<span class="hero-kicker">STUDY SUBJECT</span>' +
+      '<h1>어떤 과목을 공부할까요?</h1>' +
+      '<p class="subject-pick-description">공부할 과목을 선택해 주세요. 선택한 과목은 다음 실행에도 기억합니다.</p>' +
+      '<div class="section-head"><h2>과목 선택</h2><span>현재 등록된 과목 ' + SUBJECTS.length + '개</span></div>' +
+      '<div class="subject-pick-grid">';
+
+    SUBJECTS.forEach(function (subject) {
+      html += '<button type="button" class="subject-pick-button" data-select-subject="' + esc(subject.id) + '">' +
+        '<span class="subject-pick-mark" aria-hidden="true">社</span>' +
+        '<span class="subject-pick-copy"><strong>' + esc(subject.title) + '</strong>' +
+        '<small>' + esc(subject.curriculum) + '</small><span>' + esc(subject.detail) + '</span></span>' +
+        '<span class="subject-pick-action">' + (selected === subject.id ? '선택됨' : '선택하기') + ' <span aria-hidden="true">→</span></span>' +
+        '</button>';
+    });
+
+    html += '</div><p class="subject-pick-footnote">현재 실제 학습 데이터가 준비된 과목만 표시합니다. 다른 과목은 문제와 해설 데이터가 준비되면 이 목록에 추가됩니다.</p></div>';
+    el.views.subjectSelect.innerHTML = html;
+  }
+
+  function chooseSubject(id) {
+    var subject = SUBJECTS.filter(function (item) { return item.id === id; })[0];
+    if (!subject) return;
+    storage.setItem(SELECTED_SUBJECT_KEY, subject.id);
+    show('home');
   }
 
   /* ─── 홈 ─── */
@@ -481,6 +560,7 @@
 
   function render() {
     switch (state.view) {
+      case 'subject-select': renderSubjectSelect(); break;
       case 'home': renderHome(); break;
       case 'quiz': renderQuiz(); break;
       case 'concepts': renderConcepts(); break;
@@ -500,6 +580,11 @@
       e.preventDefault();
       show(b.dataset.nav);
     });
+  });
+
+  document.addEventListener('click', function (event) {
+    var button = event.target && event.target.closest ? event.target.closest('[data-select-subject]') : null;
+    if (button) chooseSubject(button.dataset.selectSubject);
   });
 
   /* ─── 모의고사 모듈에 뷰 전달 ─── */
