@@ -206,6 +206,8 @@
     var capture = { capture: true, passive: false };
     document.addEventListener('pointerdown', onPointerDown, capture);
     document.addEventListener('pointermove', onPointerMove, capture);
+    /* 고주사율 펜의 프레임 사이 이동도 가능한 브라우저에서는 별도로 수집합니다. */
+    document.addEventListener('pointerrawupdate', onPointerMove, capture);
     document.addEventListener('mousemove', onMouseMoveFallback, true);
     document.addEventListener('pointerup', finish, true);
     document.addEventListener('pointercancel', cancel, true);
@@ -257,6 +259,7 @@
       if (resizeObserver) resizeObserver.disconnect();
       document.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('pointermove', onPointerMove, true);
+      document.removeEventListener('pointerrawupdate', onPointerMove, true);
       document.removeEventListener('mousemove', onMouseMoveFallback, true);
       document.removeEventListener('pointerup', finish, true);
       document.removeEventListener('pointercancel', cancel, true);
