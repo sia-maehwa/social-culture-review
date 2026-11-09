@@ -105,7 +105,9 @@
         activeTarget = next;
         if (activeTarget) activeTarget.classList.add('pen-hover-target', 'pen-hover');
       }
-      if (pointerType === 'pen') lockPenRoot(target);
+      /* 일부 Android 펜 드라이버는 hover를 mouse 계열로 보고합니다.
+         실제 touch에서 생성된 mouse 이벤트는 위에서 제외했으므로 이 경로도 펜 입력 면을 잠급니다. */
+      if (pointerType === 'pen' || pointerType === 'mouse') lockPenRoot(target);
     }
     function hitTest(event) {
       if (typeof document.elementFromPoint === 'function') {
