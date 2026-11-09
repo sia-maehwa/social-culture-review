@@ -1,0 +1,45 @@
+name: quality-check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: |
+          find js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Check local script and stylesheet references
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const refs = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)]
+            .map(match => match[1])
+            .filter(ref => !/^https?:\/\//i.test(ref));
+          const missing = refs.filter(ref => !fs.existsSync(path.resolve(ref)));
+          if (missing.length) {
+            console.error('Missing local assets:', missing.join(', '));
+            process.exit(1);
+          }
+          if (!html.includes('js/subject-registry.js') || !html.includes('js/subjects/social-culture.js')) {
+            throw new Error('Subject registry scripts are not wired into index.html');
+          }
+          if (fs.existsSync('assets/exams')) {
+            throw new Error('Uncleared official exam image directory is still present in the public tree');
+          }
+          console.log('Local references and rights hold checks passed.');
+          NODE

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>사회문화 연습장 — 수능 개념 문제 연습</title>
-<meta name="description" content="사회·문화 수능 대비 단원별 개념 문제 연습 사이트. 기출 스타일 5지선다 문제와 상세 해설, 오답 노트, 단원별 개념 정리 제공." />
+<title>학습 연습장 — 과목별 문제 풀이</title>
+<meta name="description" content="과목별 단원 학습, 문제 풀이, 오답 노트, 개념 정리와 스타일러스 필기를 제공하는 학습 연습장." />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232f4fc0'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'>社</text></svg>" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
 <link rel="stylesheet" href="css/style.css" />
@@ -17,6 +17,10 @@
       <svg width="30" height="30" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="var(--color-primary)"/><text x="50" y="70" font-size="52" text-anchor="middle" fill="#fff" font-weight="700">社</text></svg>
       <span class="logo-text">사회문화 <em>연습장</em></span>
     </a>
+    <label class="subject-switcher" id="subjectSwitcherWrap" hidden>
+      <span>과목</span>
+      <select id="subjectSwitcher" aria-label="학습 과목 선택"></select>
+    </label>
     <nav class="gnb" aria-label="주요 메뉴">
       <button class="gnb-btn" data-nav="home" type="button">문제 풀기</button>
       <button class="gnb-btn" data-nav="exam" type="button">실전 모의고사</button>
@@ -49,13 +53,17 @@
 </main>
 
 <footer class="site-footer">
-  <p>사회문화 연습장 — 2015 개정 교육과정 '사회·문화' 기준 · 개념 문제는 기출 출제 경향을 반영해 자체 제작, 실전 모의고사는 한국교육과정평가원이 출제한 실제 기출(2022~2026학년도 수능·6월·9월)입니다.</p>
+  <p>과목별 단원 학습 · 문제 풀이 · 오답 노트 · 개념 정리 · 스타일러스 필기</p>
 </footer>
 
 <script src="js/data.js"></script>
 <script src="js/exams.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/predict.js"></script>
+<script src="js/subject-registry.js"></script>
+<script src="js/subjects/social-culture.js"></script>
+<!-- 새 과목 모듈은 SubjectRegistry.init() 호출 전에 추가합니다. -->
+<script>window.SubjectRegistry.init();</script>
 <script src="js/game.js"></script>
 <script src="js/pen-tools.js"></script>
 <script src="js/exam-app.js"></script>
