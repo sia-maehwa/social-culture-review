@@ -93,6 +93,12 @@
     function setTouchTarget(target) {
       var root = target && target.closest ? target.closest('.pen-surface-root') : null;
       var next = root ? target : null;
+      /* touch-action은 일반 inline 요소에는 적용되지 않으므로 실제 박스가 있는 부모에 둡니다. */
+      while (next && next !== root) {
+        var display = window.getComputedStyle(next).display;
+        if (display !== 'inline' && display !== 'contents') break;
+        next = next.parentElement;
+      }
       if (next === touchTarget) return;
       if (touchTarget) touchTarget.classList.remove('pen-touch-ready');
       touchTarget = next;
