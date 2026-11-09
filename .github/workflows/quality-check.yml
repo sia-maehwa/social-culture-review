@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -21,6 +21,7 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           find js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          node --check scripts/build-offline.js
       - name: Check local files and exam data integrity
         run: |
           node <<'NODE'
@@ -49,7 +50,7 @@ jobs:
           const questionCount = vm.runInContext('EXAMS.reduce((sum, exam) => sum + exam.questions.length, 0)', context);
           const predictCount = vm.runInContext('PREDICT_EXAMS.length', context);
           if (examCount !== 15 || questionCount !== 300 || predictCount !== 3) {
-            throw new Error(`Unexpected dataset: ${examCount} official sessions / ${questionCount} questions / ${predictCount} self-made sessions`);
+            throw new Error('Unexpected dataset: ' + examCount + ' official sessions / ' + questionCount + ' questions / ' + predictCount + ' self-made sessions');
           }
 
           let imageCount = 0;
@@ -68,3 +69,18 @@ jobs:
             echo 'Unexpected editor-injected script remains in index.html'
             exit 1
           fi
+      - name: Build standalone offline HTML
+        if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
+        run: node scripts/build-offline.js
+      - name: Commit generated offline HTML
+        if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add offline/index.html
+          if git diff --cached --quiet; then
+            echo "Offline HTML is already current."
+            exit 0
+          fi
+          git commit -m "Build standalone offline study app"
+          git push
