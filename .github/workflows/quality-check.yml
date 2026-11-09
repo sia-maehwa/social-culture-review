@@ -21,25 +21,50 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           find js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
-      - name: Check local script and stylesheet references
+      - name: Check local files and exam data integrity
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const path = require('node:path');
+          const vm = require('node:vm');
+
           const html = fs.readFileSync('index.html', 'utf8');
-          const refs = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)]
+          const refPattern = new RegExp('(?:src|href)="([^"]+\\.(?:js|css))"', 'g');
+          const refs = [...html.matchAll(refPattern)]
             .map(match => match[1])
-            .filter(ref => !/^https?:\/\//i.test(ref));
+            .filter(ref => !ref.startsWith('http://') && !ref.startsWith('https://'));
           const missing = refs.filter(ref => !fs.existsSync(path.resolve(ref)));
-          if (missing.length) {
-            console.error('Missing local assets:', missing.join(', '));
-            process.exit(1);
+          if (missing.length) throw new Error('Missing local assets: ' + missing.join(', '));
+
+          for (const required of ['js/subject-registry.js', 'js/subjects/social-culture.js', 'css/style.css']) {
+            if (!fs.existsSync(required)) throw new Error('Required app file missing: ' + required);
           }
-          if (!html.includes('js/subject-registry.js') || !html.includes('js/subjects/social-culture.js')) {
-            throw new Error('Subject registry scripts are not wired into index.html');
+
+          const context = {};
+          vm.createContext(context);
+          for (const file of ['js/data.js', 'js/exams.js', 'js/predict.js']) {
+            vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
           }
-          if (fs.existsSync('assets/exams')) {
-            throw new Error('Uncleared official exam image directory is still present in the public tree');
+          const examCount = vm.runInContext('EXAMS.length', context);
+          const questionCount = vm.runInContext('EXAMS.reduce((sum, exam) => sum + exam.questions.length, 0)', context);
+          const predictCount = vm.runInContext('PREDICT_EXAMS.length', context);
+          if (examCount !== 15 || questionCount !== 300 || predictCount !== 3) {
+            throw new Error(`Unexpected dataset: ${examCount} official sessions / ${questionCount} questions / ${predictCount} self-made sessions`);
           }
-          console.log('Local references and rights hold checks passed.');
+
+          let imageCount = 0;
+          for (const exam of vm.runInContext('EXAMS', context)) {
+            for (let n = 1; n <= 20; n++) {
+              const file = path.join('assets', 'exams', exam.id, 'q' + String(n).padStart(2, '0') + '.jpg');
+              if (!fs.existsSync(file)) throw new Error('Missing exam image: ' + file);
+              imageCount++;
+            }
+          }
+          if (imageCount !== 300) throw new Error('Expected 300 official exam JPGs, found ' + imageCount);
+          console.log('Validated 15 official sessions, 300 exam questions/images, 3 self-made sessions, and local app references.');
           NODE
+
+          if grep -q 'data-pplx-inline-edit' index.html; then
+            echo 'Unexpected editor-injected script remains in index.html'
+            exit 1
+          fi
